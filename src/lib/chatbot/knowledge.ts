@@ -26,7 +26,7 @@ export const COMPANY_KNOWLEDGE = {
     {
       name: "AI Workflow Automation",
       description: "End-to-end automation of repetitive business processes, from data entry to complex multi-step workflows. Integrate with your existing tools and eliminate manual work.",
-      benefits: ["Eliminate manual data entry", "Reduce errors by 95%", "Save 200+ hours/month", "Seamless integrations"],
+      benefits: ["Eliminate manual data entry", "Reduce errors (illustrative: up to 95%)", "Save 200+ hours/month (illustrative example)", "Seamless integrations"],
       useCases: ["Document processing", "Email automation", "Report generation", "Data synchronization"],
     },
     {

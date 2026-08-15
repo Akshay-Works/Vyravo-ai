@@ -96,7 +96,7 @@ export default function ContactPage() {
 
               {/* Map placeholder */}
               <div className="rounded-2xl border border-border bg-surface overflow-hidden h-48 flex items-center justify-center">
-                <p className="text-sm text-grey">📍 We serve clients worldwide</p>
+                <p className="text-sm text-grey">📍 Serving businesses worldwide</p>
               </div>
             </div>
           </div>

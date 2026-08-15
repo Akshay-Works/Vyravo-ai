@@ -13,7 +13,7 @@ const faqCategories = [
     faqs: [
       { question: "What is Vyravo AI?", answer: "Vyravo AI is a premium AI automation company that helps businesses automate repetitive work using AI chatbots, voice agents, workflow automation, sales automation, and custom AI solutions." },
       { question: "What industries do you serve?", answer: "We serve businesses across healthcare, restaurants, real estate, hotels & hospitality, finance, manufacturing, education, marketing agencies, professional services, e-commerce, and more." },
-      { question: "Where is Vyravo AI based?", answer: "We are based in India and serve clients worldwide. We accommodate different time zones for meetings and support." },
+      { question: "Where is Vyravo AI based?", answer: "We are based in India and work with businesses worldwide. We accommodate different time zones for meetings and support." },
       { question: "How is Vyravo AI different from other AI agencies?", answer: "We focus on measurable business outcomes rather than just technology delivery. Every project is custom-built with transparent pricing, dedicated support, and continuous optimization." },
       { question: "Do you work with startups or only enterprises?", answer: "We work with businesses of all sizes — startups, SMEs, and enterprises. Our solutions are designed to scale with your business as it grows." },
     ],
@@ -35,7 +35,7 @@ const faqCategories = [
       { question: "Which platforms do your chatbots support?", answer: "We deploy chatbots on websites, WhatsApp, Facebook Messenger, Slack, Microsoft Teams, SMS, and custom platforms via API." },
       { question: "Can chatbots be trained on our company data?", answer: "Absolutely. We train chatbots on your company knowledge base, products, services, and policies to provide accurate, context-aware responses." },
       { question: "Do chatbots support multiple languages?", answer: "Yes. Our AI chatbots support multi-language conversations, making them ideal for businesses with international customers." },
-      { question: "How accurate are the chatbot responses?", answer: "With proper training on your data, our chatbots achieve 90%+ accuracy. We continuously monitor and optimize performance post-launch." },
+      { question: "How accurate are the chatbot responses?", answer: "We engineer our chatbots to achieve 90%+ response accuracy when trained on well-structured business data — and we continuously monitor and optimize performance after launch." },
     ],
   },
   {

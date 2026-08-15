@@ -64,7 +64,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               name: "Vyravo AI",
               description:
                 "Intelligent Automation for Modern Businesses. AI chatbots, voice agents, workflow automation & custom AI solutions.",
-              url: "https://vyravo.com",
+              url: "https://vyravo-ai.vercel.app",
               contactPoint: {
                 "@type": "ContactPoint",
                 telephone: "+91-9075707650",

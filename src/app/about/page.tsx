@@ -120,6 +120,9 @@ export default function AboutPage() {
               </div>
             ))}
           </div>
+          <p className="mt-6 text-xs text-grey-dark text-center max-w-2xl mx-auto">
+            *Illustrative benchmarks based on typical automation scenarios — your actual results are measured against clear KPIs from day one.
+          </p>
         </div>
       </section>
 
