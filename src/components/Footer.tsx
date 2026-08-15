@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { Logo } from "./Logo";
-import { COMPANY, SERVICES } from "@/lib/constants";
+import { COMPANY, SERVICES, SITE_LINKS } from "@/lib/constants";
 
-const footerLinks = {
+const footerLinks: Record<string, { label: string; href: string; external?: boolean }[]> = {
   Company: [
     { label: "About", href: "/about" },
     { label: "Services", href: "/services" },
@@ -14,6 +14,7 @@ const footerLinks = {
     { label: "FAQ", href: "/faq" },
     { label: "Contact", href: "/contact" },
     { label: "Book Discovery Call", href: "/book-discovery-call" },
+    { label: "Email Automation Dashboard", href: SITE_LINKS.emailAutomation, external: true },
   ],
   Legal: [
     { label: "Privacy Policy", href: "/privacy-policy" },
@@ -68,6 +69,7 @@ export function Footer() {
                   <li key={link.href}>
                     <Link
                       href={link.href}
+                      {...(link.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
                       className="text-sm text-grey hover:text-white transition-colors"
                     >
                       {link.label}

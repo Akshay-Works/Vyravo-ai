@@ -10,12 +10,18 @@ export const COMPANY = {
   hours: "Mon – Fri, 9:00 AM – 6:00 PM IST",
 };
 
-export const NAV_LINKS = [
+export const SITE_LINKS = {
+  mainSite: "https://vyravo-ai.vercel.app",
+  emailAutomation: "https://vyravo-ai-email-automation-yf54.vercel.app",
+};
+
+export const NAV_LINKS: { label: string; href: string; external?: boolean }[] = [
   { label: "Home", href: "/" },
   { label: "About", href: "/about" },
   { label: "Services", href: "/services" },
   { label: "Industries", href: "/industries" },
   { label: "Case Studies", href: "/case-studies" },
+  { label: "Email Automation", href: SITE_LINKS.emailAutomation, external: true },
   { label: "Pricing", href: "/pricing" },
   { label: "FAQ", href: "/faq" },
   { label: "Contact", href: "/contact" },

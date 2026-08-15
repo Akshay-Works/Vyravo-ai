@@ -33,6 +33,7 @@ export function Header() {
               <Link
                 key={link.href}
                 href={link.href}
+                {...(link.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
                 className="px-3 py-2 text-sm text-grey hover:text-white transition-colors rounded-lg hover:bg-white/5"
               >
                 {link.label}
@@ -76,6 +77,7 @@ export function Header() {
               <Link
                 key={link.href}
                 href={link.href}
+                {...(link.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
                 className="block px-4 py-3 text-sm text-grey hover:text-white hover:bg-white/5 rounded-lg transition-colors"
                 onClick={() => setMobileOpen(false)}
               >
