@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { SITE_LINKS } from "@/lib/constants";
 import { SectionHeading } from "@/components/SectionHeading";
 import { CTA } from "@/components/CTA";
 
@@ -175,9 +176,9 @@ export default function IndustriesPage() {
                   </div>
                   <h3 className="text-sm font-semibold text-white uppercase tracking-wider mb-2 mt-4">Business Impact</h3>
                   <p className="text-sm text-accent font-medium">{ind.impact}</p>
-                  <Link href="/book-discovery-call" className="btn-primary text-xs mt-4 py-2 px-4">
+                  <a href={SITE_LINKS.discoveryCall} target="_blank" rel="noopener noreferrer" className="btn-primary text-xs mt-4 py-2 px-4">
                     Get Started →
-                  </Link>
+                  </a>
                 </div>
               </div>
             </div>

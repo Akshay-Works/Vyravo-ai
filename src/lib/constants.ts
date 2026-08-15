@@ -13,6 +13,8 @@ export const COMPANY = {
 export const SITE_LINKS = {
   mainSite: "https://vyravo-ai.vercel.app",
   emailAutomation: "https://vyravo-ai-email-automation-yf54.vercel.app",
+  discoveryCall: "https://vyravo-ai-discovery-call.vercel.app",
+  crm: "https://vyravo-ai-crm.vercel.app",
 };
 
 export const NAV_LINKS: { label: string; href: string; external?: boolean }[] = [
@@ -21,10 +23,27 @@ export const NAV_LINKS: { label: string; href: string; external?: boolean }[] = 
   { label: "Services", href: "/services" },
   { label: "Industries", href: "/industries" },
   { label: "Case Studies", href: "/case-studies" },
-  { label: "Email Automation", href: SITE_LINKS.emailAutomation, external: true },
   { label: "Pricing", href: "/pricing" },
   { label: "FAQ", href: "/faq" },
   { label: "Contact", href: "/contact" },
+];
+
+export const APP_LINKS = [
+  {
+    label: "Email Automation",
+    href: SITE_LINKS.emailAutomation,
+    description: "Campaigns, workflows & email analytics",
+  },
+  {
+    label: "Discovery Call Automation",
+    href: SITE_LINKS.discoveryCall,
+    description: "AI lead qualification & call booking",
+  },
+  {
+    label: "CRM",
+    href: SITE_LINKS.crm,
+    description: "Leads, pipeline & client management",
+  },
 ];
 
 export const SERVICES = [

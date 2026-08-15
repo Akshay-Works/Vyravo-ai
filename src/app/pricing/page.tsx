@@ -4,7 +4,7 @@ import { SectionHeading } from "@/components/SectionHeading";
 import { ServiceIcon } from "@/components/ServiceIcon";
 import { CTA } from "@/components/CTA";
 import { Accordion } from "@/components/Accordion";
-import { SERVICES } from "@/lib/constants";
+import { SERVICES, SITE_LINKS } from "@/lib/constants";
 
 export const metadata: Metadata = {
   title: "Pricing",
@@ -75,9 +75,9 @@ export default function PricingPage() {
                     </li>
                   ))}
                 </ul>
-                <Link href="/book-discovery-call" className="btn-primary w-full justify-center mt-6 text-sm">
+                <a href={SITE_LINKS.discoveryCall} target="_blank" rel="noopener noreferrer" className="btn-primary w-full justify-center mt-6 text-sm">
                   Get Custom Quote
-                </Link>
+                </a>
               </div>
             ))}
           </div>

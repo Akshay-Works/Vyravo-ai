@@ -1,10 +1,15 @@
 import Link from "next/link";
+import { SITE_LINKS } from "@/lib/constants";
+
+function isExternal(href: string) {
+  return href.startsWith("http");
+}
 
 export function CTA({
   title = "Ready to Automate Your Business?",
   description = "Book a free discovery call and let us show you how AI can save time, reduce costs, and help your business scale.",
   primaryText = "Book Free Discovery Call",
-  primaryHref = "/book-discovery-call",
+  primaryHref = SITE_LINKS.discoveryCall,
   secondaryText = "Explore Solutions",
   secondaryHref = "/services",
 }: {
@@ -31,12 +36,21 @@ export function CTA({
               {description}
             </p>
             <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Link href={primaryHref} className="btn-primary text-base px-8 py-3.5">
-                {primaryText}
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                </svg>
-              </Link>
+              {isExternal(primaryHref) ? (
+                <a href={primaryHref} target="_blank" rel="noopener noreferrer" className="btn-primary text-base px-8 py-3.5">
+                  {primaryText}
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                  </svg>
+                </a>
+              ) : (
+                <Link href={primaryHref} className="btn-primary text-base px-8 py-3.5">
+                  {primaryText}
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                  </svg>
+                </Link>
+              )}
               <Link href={secondaryHref} className="btn-secondary text-base px-8 py-3.5">
                 {secondaryText}
               </Link>

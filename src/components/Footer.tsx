@@ -13,8 +13,9 @@ const footerLinks: Record<string, { label: string; href: string; external?: bool
   Resources: [
     { label: "FAQ", href: "/faq" },
     { label: "Contact", href: "/contact" },
-    { label: "Book Discovery Call", href: "/book-discovery-call" },
-    { label: "Email Automation Dashboard", href: SITE_LINKS.emailAutomation, external: true },
+    { label: "Book Discovery Call", href: SITE_LINKS.discoveryCall, external: true },
+    { label: "Email Automation", href: SITE_LINKS.emailAutomation, external: true },
+    { label: "CRM", href: SITE_LINKS.crm, external: true },
   ],
   Legal: [
     { label: "Privacy Policy", href: "/privacy-policy" },

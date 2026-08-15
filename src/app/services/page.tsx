@@ -4,7 +4,7 @@ import { SectionHeading } from "@/components/SectionHeading";
 import { ServiceIcon } from "@/components/ServiceIcon";
 import { CTA } from "@/components/CTA";
 import { Accordion } from "@/components/Accordion";
-import { SERVICES, PROCESS_STEPS } from "@/lib/constants";
+import { SERVICES, PROCESS_STEPS, SITE_LINKS } from "@/lib/constants";
 
 export const metadata: Metadata = {
   title: "Services",
@@ -59,9 +59,9 @@ export default function ServicesPage() {
                   ))}
                 </div>
                 <div className="mt-8 flex items-center gap-4">
-                  <Link href="/book-discovery-call" className="btn-primary text-sm">
+                  <a href={SITE_LINKS.discoveryCall} target="_blank" rel="noopener noreferrer" className="btn-primary text-sm">
                     Get Started
-                  </Link>
+                  </a>
                   <span className="text-sm text-grey">From {service.startingPrice}</span>
                 </div>
               </div>

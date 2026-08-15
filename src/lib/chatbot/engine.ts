@@ -3,6 +3,7 @@
 
 import { COMPANY_KNOWLEDGE, INDUSTRY_RECOMMENDATIONS, OBJECTION_RESPONSES } from "./knowledge";
 import type { ChatMessage, ConversationContext, ChatResponse, QuickAction, LeadInfo } from "./types";
+import { SITE_LINKS } from "../constants";
 
 // Intent detection patterns
 const INTENT_PATTERNS: Record<string, RegExp[]> = {
@@ -89,7 +90,7 @@ function extractLeadInfo(message: string, context: ConversationContext): Partial
 
 function generateBookingActions(): QuickAction[] {
   return [
-    { id: "book", label: "📅 Book Discovery Call", action: "link", value: "/book-discovery-call" },
+    { id: "book", label: "📅 Book Discovery Call", action: "link", value: SITE_LINKS.discoveryCall },
     { id: "learn", label: "📖 Learn More First", action: "message", value: "Tell me more about your services" },
   ];
 }
@@ -123,7 +124,7 @@ export function generateResponse(
           { id: "services", label: "💬 What services do you offer?", action: "message", value: "What services do you offer?" },
           { id: "help", label: "🤖 How can AI help my business?", action: "message", value: "How can AI help my business?" },
           { id: "pricing", label: "💰 Pricing", action: "message", value: "What are your prices?" },
-          { id: "book", label: "📅 Book Discovery Call", action: "link", value: "/book-discovery-call" },
+          { id: "book", label: "📅 Book Discovery Call", action: "link", value: SITE_LINKS.discoveryCall },
         ],
         intent,
       };
@@ -145,7 +146,7 @@ export function generateResponse(
         suggestedActions: [
           { id: "example", label: "Show me examples", action: "message", value: "Show me chatbot examples" },
           { id: "pricing", label: "💰 Pricing details", action: "message", value: "How much does a chatbot cost?" },
-          { id: "book", label: "📅 Book Discovery Call", action: "link", value: "/book-discovery-call" },
+          { id: "book", label: "📅 Book Discovery Call", action: "link", value: SITE_LINKS.discoveryCall },
         ],
         intent,
       };
@@ -227,7 +228,7 @@ export function generateResponse(
       return {
         message: `I'd love to set you up with a discovery call! 📅\n\n**What to expect:**\n• Duration: ${discoveryCall.duration}\n• Cost: ${discoveryCall.cost}\n• No obligation whatsoever\n\n**You'll get:**\n${discoveryCall.includes.slice(0, 4).map(i => `• ${i}`).join("\n")}\n\n${discoveryCall.nextSteps}\n\nYou can book directly on our website, or I can share more info first. What would you prefer?`,
         suggestedActions: [
-          { id: "book", label: "📅 Book Now", action: "link", value: "/book-discovery-call" },
+          { id: "book", label: "📅 Book Now", action: "link", value: SITE_LINKS.discoveryCall },
           { id: "more", label: "Tell me more first", action: "message", value: "What happens during the call?" },
         ],
         intent,
@@ -240,7 +241,7 @@ export function generateResponse(
         suggestedActions: [
           { id: "call", label: "📞 Call Now", action: "link", value: contact.phoneLink },
           { id: "email", label: "📧 Email Us", action: "link", value: contact.emailLink },
-          { id: "book", label: "📅 Book Discovery Call", action: "link", value: "/book-discovery-call" },
+          { id: "book", label: "📅 Book Discovery Call", action: "link", value: SITE_LINKS.discoveryCall },
         ],
         intent,
       };
@@ -293,7 +294,7 @@ export function generateResponse(
       return {
         message: "You're welcome! 😊 I'm glad I could help. Is there anything else you'd like to know about AI automation for your business?",
         suggestedActions: [
-          { id: "book", label: "📅 Book Discovery Call", action: "link", value: "/book-discovery-call" },
+          { id: "book", label: "📅 Book Discovery Call", action: "link", value: SITE_LINKS.discoveryCall },
           { id: "more", label: "I have more questions", action: "message", value: "I have another question" },
         ],
         intent,
@@ -321,7 +322,7 @@ export function generateResponse(
         suggestedActions: [
           { id: "services", label: "💬 Services", action: "message", value: "What services do you offer?" },
           { id: "pricing", label: "💰 Pricing", action: "message", value: "What are your prices?" },
-          { id: "book", label: "📅 Book Call", action: "link", value: "/book-discovery-call" },
+          { id: "book", label: "📅 Book Call", action: "link", value: SITE_LINKS.discoveryCall },
         ],
         intent,
       };
@@ -335,7 +336,7 @@ export function getWelcomeMessage(): ChatResponse {
       { id: "services", label: "💬 What services do you offer?", action: "message", value: "What services do you offer?" },
       { id: "help", label: "🤖 How can AI help my business?", action: "message", value: "How can AI help my business?" },
       { id: "pricing", label: "💰 Pricing", action: "message", value: "What are your prices?" },
-      { id: "book", label: "📅 Book Discovery Call", action: "link", value: "/book-discovery-call" },
+      { id: "book", label: "📅 Book Discovery Call", action: "link", value: SITE_LINKS.discoveryCall },
     ],
   };
 }

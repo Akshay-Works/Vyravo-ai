@@ -3,7 +3,7 @@ import { SectionHeading } from "@/components/SectionHeading";
 import { ServiceIcon } from "@/components/ServiceIcon";
 import { CTA } from "@/components/CTA";
 import { Accordion } from "@/components/Accordion";
-import { SERVICES, INDUSTRIES, PROCESS_STEPS, STATS, TESTIMONIALS } from "@/lib/constants";
+import { SERVICES, INDUSTRIES, PROCESS_STEPS, STATS, TESTIMONIALS, SITE_LINKS } from "@/lib/constants";
 
 export default function HomePage() {
   return (
@@ -32,12 +32,12 @@ export default function HomePage() {
           </p>
 
           <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link href="/book-discovery-call" className="btn-primary text-base px-8 py-4">
+            <a href={SITE_LINKS.discoveryCall} target="_blank" rel="noopener noreferrer" className="btn-primary text-base px-8 py-4">
               Book Free Discovery Call
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
               </svg>
-            </Link>
+            </a>
             <Link href="/services" className="btn-secondary text-base px-8 py-4">
               Explore Solutions
             </Link>
