@@ -1,6 +1,7 @@
 import { generateResponse, getWelcomeMessage } from "@/lib/chatbot/engine";
 import type { ConversationContext, ChatMessage } from "@/lib/chatbot/types";
 import { syncLeadToHubSpot, isHubSpotConfigured } from "@/lib/integrations/hubspot";
+import { tryKnowledgeBaseAnswer } from "@/lib/knowledge-base/chat-integration";
 
 export const dynamic = "force-dynamic";
 
@@ -26,8 +27,20 @@ export async function POST(request: Request) {
     };
     conversationContext.messages.push(userMessage);
 
-    // Generate response
-    const response = generateResponse(message, conversationContext);
+    // Generate response — try the PUBLIC Knowledge Base first (only ever
+    // returns PUBLIC + APPROVED content), then fall back to the engine.
+    let response = null as Awaited<ReturnType<typeof generateResponse>> | null;
+    let usedKb = false;
+    const kbOutcome = await tryKnowledgeBaseAnswer(message, conversationContext);
+    if (kbOutcome) {
+      response = {
+        message: kbOutcome.response,
+        intent: undefined,
+      };
+      usedKb = kbOutcome.usedKb;
+    } else {
+      response = generateResponse(message, conversationContext);
+    }
 
     // Add assistant message to context
     const assistantMessage: ChatMessage = {
@@ -81,6 +94,7 @@ export async function POST(request: Request) {
       suggestedActions: response.suggestedActions,
       shouldCollectInfo: response.shouldCollectInfo,
       leadCaptured,
+      usedKb,
       context: conversationContext,
     });
   } catch (error) {

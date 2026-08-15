@@ -120,3 +120,58 @@ export function renderGreeting(config: VoiceConfig): string {
     .replaceAll("{business}", config.businessName)
     .replaceAll("{name}", config.receptionistName);
 }
+
+// ---------------------------------------------------------------------------
+// Internal Knowledge Base hook (async)
+//
+// When the Internal Knowledge Base feature is active, customer-facing voice
+// answers can be enriched with PUBLIC + APPROVED knowledge. This is the ONLY
+// place the voice receptionist touches the Knowledge Base — it never sees
+// internal/confidential content.
+// ---------------------------------------------------------------------------
+
+export const VOICE_KB_ENABLED = (process.env.VOICE_KB_ENABLED ?? "true") !== "false";
+// Local MiniLM scores ~0.3–0.5; cloud providers score higher.
+const VOICE_KB_THRESHOLD =
+  process.env.EMBEDDING_PROVIDER === "openai" ||
+  process.env.EMBEDDING_PROVIDER === "cohere" ||
+  process.env.EMBEDDING_PROVIDER === "google"
+    ? 0.42
+    : 0.3;
+
+export interface VoiceKbAnswer {
+  text: string;
+  usedKb: boolean;
+}
+
+/**
+ * Try to answer a caller's question from PUBLIC + APPROVED Knowledge Base
+ * content. Returns null when there is no strong match (the engine then keeps
+ * its own deterministic answer). Safe to call on every turn — it falls back
+ * to null on any error and never throws.
+ */
+export async function getVoiceKnowledgeBaseAnswer(
+  question: string
+): Promise<VoiceKbAnswer | null> {
+  if (!VOICE_KB_ENABLED) return null;
+  try {
+    const { searchPublicKnowledge } = await import("@/lib/knowledge-base/public-client");
+    const hits = await searchPublicKnowledge({
+      query: question,
+      topK: 1,
+      threshold: VOICE_KB_THRESHOLD,
+    });
+    if (hits.length === 0) return null;
+
+    // Only use KB when the match is strong enough to be trusted out loud.
+    if (hits[0].score < VOICE_KB_THRESHOLD) return null;
+
+    return {
+      text: hits[0].content.slice(0, 350),
+      usedKb: true,
+    };
+  } catch (e) {
+    console.error("Voice KB hook error (voice keeps engine answer):", e);
+    return null;
+  }
+}

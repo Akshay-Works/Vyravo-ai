@@ -6,6 +6,7 @@
 import { processTurn } from "@/lib/voice/engine";
 import { getSession, setSession } from "@/lib/voice/sessions";
 import { isAuthorized, unauthorizedResponse } from "@/lib/voice/auth";
+import { getVoiceKnowledgeBaseAnswer } from "@/lib/voice/knowledge";
 
 export const dynamic = "force-dynamic";
 
@@ -34,11 +35,33 @@ export async function POST(request: Request) {
   }
 
   const turn = processTurn(state, message);
+
+  // Knowledge Base enrichment (PUBLIC + APPROVED only) — the engine reply
+  // stays authoritative for the conversation flow. We only enrich the weak
+  // intents (general_inquiry / unknown) where the engine would otherwise give
+  // a generic answer; business_hours / location / pricing / service_inquiry
+  // are already answered accurately from the seeded knowledge.
+  let reply = turn.reply;
+  let usedKb = false;
+  const kbEnrichIntents = new Set(["general_inquiry", "unknown"]);
+  if (turn.intent && kbEnrichIntents.has(turn.intent)) {
+    try {
+      const kb = await getVoiceKnowledgeBaseAnswer(message);
+      if (kb) {
+        reply = `${kb.text} ${turn.reply}`.trim();
+        usedKb = true;
+      }
+    } catch {
+      // keep engine reply
+    }
+  }
+
   setSession(state);
 
   return Response.json({
     callId,
-    reply: turn.reply,
+    reply,
+    usedKb,
     intent: turn.intent,
     leadStatus: turn.leadStatus,
     leadQualified: turn.leadQualified,

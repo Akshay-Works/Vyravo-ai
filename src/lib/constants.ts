@@ -50,6 +50,11 @@ export const APP_LINKS = [
     href: SITE_LINKS.crm,
     description: "Leads, pipeline & client management",
   },
+  {
+    label: "Knowledge Base",
+    href: "/admin/knowledge-base",
+    description: "Internal AI knowledge base & admin",
+  },
 ];
 
 export const SERVICES = [

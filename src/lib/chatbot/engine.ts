@@ -28,7 +28,7 @@ const INTENT_PATTERNS: Record<string, RegExp[]> = {
   goodbye: [/bye|goodbye|see you|talk later|that's all/i],
 };
 
-function detectIntent(message: string): string {
+export function detectIntent(message: string): string {
   const lowerMessage = message.toLowerCase();
   
   for (const [intent, patterns] of Object.entries(INTENT_PATTERNS)) {
