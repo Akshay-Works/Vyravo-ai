@@ -509,6 +509,78 @@ export const contactSubmissions = pgTable("contact_submissions", {
   read: boolean("read").default(false).notNull(),
 });
 
+// ==================== VOICE RECEPTIONIST ====================
+// Table names are scoped (receptionist_*) to avoid colliding with other
+// voice-related tables that may exist in the shared database.
+export const voiceCalls = pgTable("receptionist_calls", {
+  id: serial("id").primaryKey(),
+  callId: varchar("call_id", { length: 64 }).notNull().unique(),
+  businessId: varchar("business_id", { length: 64 }).notNull().default("vyravo-demo"),
+
+  // Caller
+  callerName: text("caller_name"),
+  callerPhone: text("caller_phone"),
+  callerEmail: text("caller_email"),
+  callerCompany: text("caller_company"),
+
+  // Conversation outcome
+  intent: varchar("intent", { length: 50 }),
+  leadStatus: varchar("lead_status", { length: 20 }).notNull().default("new"),
+  qualification: jsonb("qualification").$type<Record<string, string | undefined>>(),
+  transcript: jsonb("transcript").$type<{ role: string; text: string; at: string }[]>(),
+  summary: text("summary"),
+  outcome: varchar("outcome", { length: 60 }),
+  actions: jsonb("actions").$type<string[]>(),
+
+  // Metrics
+  durationSec: integer("duration_sec").notNull().default(0),
+
+  // Follow-up & integrations
+  followUpRequired: boolean("follow_up_required").notNull().default(false),
+  followUpStatus: varchar("follow_up_status", { length: 20 }).notNull().default("none"),
+  crmSyncStatus: varchar("crm_sync_status", { length: 20 }).notNull().default("not_required"),
+  emailStatus: varchar("email_status", { length: 20 }).notNull().default("not_required"),
+
+  // Provenance
+  source: varchar("source", { length: 10 }).notNull().default("demo"),
+  recordingAvailable: boolean("recording_available").notNull().default(false),
+  transcriptAvailable: boolean("transcript_available").notNull().default(false),
+
+  // Timestamps
+  startedAt: timestamp("started_at").notNull().defaultNow(),
+  endedAt: timestamp("ended_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const voiceConfig = pgTable("receptionist_config", {
+  id: serial("id").primaryKey(),
+  businessId: varchar("business_id", { length: 64 }).notNull().unique().default("vyravo-demo"),
+
+  // Business information
+  businessName: text("business_name").notNull(),
+  businessDescription: text("business_description"),
+  industry: text("industry"),
+  location: text("location"),
+  businessHours: text("business_hours"),
+  timeZone: text("time_zone"),
+
+  // Receptionist identity
+  receptionistName: text("receptionist_name").notNull(),
+  voice: text("voice"),
+  language: text("language"),
+  speakingStyle: text("speaking_style"),
+  greeting: text("greeting").notNull(),
+
+  // Escalation
+  escalationEnabled: boolean("escalation_enabled").notNull().default(true),
+  transferNumber: text("transfer_number"),
+
+  // Mode
+  demoMode: boolean("demo_mode").notNull().default(true),
+
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
 // ==================== TYPE EXPORTS ====================
 export interface MeetingBrief {
   clientSummary: string;

@@ -15,6 +15,7 @@ export const SITE_LINKS = {
   emailAutomation: "https://vyravo-ai-email-automation-yf54.vercel.app",
   discoveryCall: "https://vyravo-ai-discovery-call.vercel.app",
   crm: "https://vyravo-ai-crm.vercel.app",
+  voiceReceptionist: "/voice-receptionist",
 };
 
 export const NAV_LINKS: { label: string; href: string; external?: boolean }[] = [
@@ -29,6 +30,11 @@ export const NAV_LINKS: { label: string; href: string; external?: boolean }[] = 
 ];
 
 export const APP_LINKS = [
+  {
+    label: "Voice Receptionist",
+    href: SITE_LINKS.voiceReceptionist,
+    description: "AI call answering & lead capture",
+  },
   {
     label: "Email Automation",
     href: SITE_LINKS.emailAutomation,

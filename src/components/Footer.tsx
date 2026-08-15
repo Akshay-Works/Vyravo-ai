@@ -13,6 +13,7 @@ const footerLinks: Record<string, { label: string; href: string; external?: bool
   Resources: [
     { label: "FAQ", href: "/faq" },
     { label: "Contact", href: "/contact" },
+    { label: "Voice Receptionist", href: SITE_LINKS.voiceReceptionist },
     { label: "Book Discovery Call", href: SITE_LINKS.discoveryCall, external: true },
     { label: "Email Automation", href: SITE_LINKS.emailAutomation, external: true },
     { label: "CRM", href: SITE_LINKS.crm, external: true },
