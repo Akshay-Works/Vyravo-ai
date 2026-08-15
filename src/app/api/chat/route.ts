@@ -1,5 +1,6 @@
 import { generateResponse, getWelcomeMessage } from "@/lib/chatbot/engine";
 import type { ConversationContext, ChatMessage } from "@/lib/chatbot/types";
+import { syncLeadToHubSpot, isHubSpotConfigured } from "@/lib/integrations/hubspot";
 
 export const dynamic = "force-dynamic";
 
@@ -41,11 +42,45 @@ export async function POST(request: Request) {
     };
     conversationContext.messages.push(assistantMessage);
 
+    // Chatbot lead capture → HubSpot (best-effort, deduped by email).
+    // Fires only when the visitor actually shared an email in the chat.
+    let leadCaptured = false;
+    const leadEmail = conversationContext.leadInfo.email?.trim().toLowerCase();
+    if (
+      isHubSpotConfigured() &&
+      leadEmail &&
+      /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(leadEmail)
+    ) {
+      try {
+        const result = await syncLeadToHubSpot(
+          {
+            fullName: conversationContext.leadInfo.name || null,
+            email: leadEmail,
+            phone: conversationContext.leadInfo.phone || null,
+            businessName: conversationContext.leadInfo.company || null,
+            industry: conversationContext.leadInfo.industry || null,
+            companySize: conversationContext.leadInfo.companySize || null,
+            budgetRange: conversationContext.leadInfo.budget || null,
+            timeline: conversationContext.leadInfo.timeline || null,
+            biggestChallenge: conversationContext.leadInfo.challenges?.length
+              ? conversationContext.leadInfo.challenges.join("; ").slice(0, 500)
+              : null,
+            source: "chatbot",
+          },
+          { dealStageLabel: "Prospecting" }
+        );
+        leadCaptured = result.ok;
+      } catch (error) {
+        console.error("Chatbot HubSpot sync failed:", error);
+      }
+    }
+
     return Response.json({
       success: true,
       response: response.message,
       suggestedActions: response.suggestedActions,
       shouldCollectInfo: response.shouldCollectInfo,
+      leadCaptured,
       context: conversationContext,
     });
   } catch (error) {
