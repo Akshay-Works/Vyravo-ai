@@ -189,7 +189,8 @@ export async function resolveFirstExistingStage(labels: string[]): Promise<strin
 async function findDealForContact(contactId: string): Promise<string | null> {
   const data = await hsRequest(`/crm/v4/objects/contacts/${contactId}/associations/deals`, "GET");
   const first = data?.results?.[0];
-  return first?.id || null;
+  const dealId = first?.toObjectId ?? first?.id;
+  return dealId != null ? String(dealId) : null;
 }
 
 // ---------------------------------------------------------------------------
