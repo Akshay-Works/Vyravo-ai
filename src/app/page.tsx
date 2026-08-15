@@ -3,7 +3,7 @@ import { SectionHeading } from "@/components/SectionHeading";
 import { ServiceIcon } from "@/components/ServiceIcon";
 import { CTA } from "@/components/CTA";
 import { Accordion } from "@/components/Accordion";
-import { SERVICES, INDUSTRIES, PROCESS_STEPS, STATS, TESTIMONIALS, SITE_LINKS } from "@/lib/constants";
+import { SERVICES, INDUSTRIES, PROCESS_STEPS, STATS, SITE_LINKS } from "@/lib/constants";
 
 export default function HomePage() {
   return (
@@ -52,20 +52,23 @@ export default function HomePage() {
               </div>
             ))}
           </div>
+          <p className="mt-6 text-xs text-grey-dark max-w-2xl mx-auto">
+            *Illustrative benchmarks based on typical automation scenarios — your actual results are measured against clear KPIs from day one.
+          </p>
         </div>
 
         {/* Bottom fade */}
         <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-bg to-transparent" />
       </section>
 
-      {/* Trusted By */}
+      {/* Live Systems */}
       <section className="section-padding border-t border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <p className="text-center text-sm text-grey-dark uppercase tracking-[0.15em] mb-10">
-            Trusted by forward-thinking businesses
+            Systems we&apos;ve built — live and demonstrable
           </p>
-          <div className="flex flex-wrap items-center justify-center gap-x-12 gap-y-6 opacity-40">
-            {["TechVenture", "MedCare", "GlobalLogistics", "DataFirst", "ScaleUp", "InnovateCo"].map((name) => (
+          <div className="flex flex-wrap items-center justify-center gap-x-12 gap-y-6 opacity-60">
+            {["AI Chatbot", "Discovery Call Automation", "CRM", "Email Automation", "AI Voice Agents", "Lead Qualification"].map((name) => (
               <span key={name} className="text-lg font-semibold tracking-tight text-white font-[var(--font-heading)]">
                 {name}
               </span>
@@ -196,8 +199,8 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <SectionHeading
             label="Results"
-            title="Real Impact. Measurable Growth."
-            description="Our AI solutions consistently deliver transformative results across industries."
+            title="The Impact AI Automation Can Deliver"
+            description="Illustrative scenarios based on typical automation implementations — every project gets clear KPIs so your actual results are measured from day one."
           />
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
             {[
@@ -213,6 +216,9 @@ export default function HomePage() {
               </div>
             ))}
           </div>
+          <p className="mt-8 text-xs text-grey-dark text-center max-w-2xl mx-auto">
+            Figures shown are illustrative examples of what automation can achieve. We agree on target KPIs during discovery and report your real numbers throughout the project.
+          </p>
         </div>
       </section>
 
@@ -221,8 +227,8 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <SectionHeading
             label="Case Studies"
-            title="See How We Deliver Results"
-            description="Explore how our AI solutions have transformed businesses across industries."
+            title="See What Our Solutions Can Do"
+            description="Sample implementations showing how our AI systems transform business operations across industries."
           />
           <div className="grid md:grid-cols-3 gap-6">
             {[
@@ -254,12 +260,15 @@ export default function HomePage() {
                   <span className="text-5xl opacity-30">📊</span>
                 </div>
                 <div className="p-6">
-                  <span className="text-xs font-medium text-primary uppercase tracking-wider">{study.industry}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-primary uppercase tracking-wider">{study.industry}</span>
+                    <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-white/5 border border-border text-grey-dark uppercase tracking-wider">Sample</span>
+                  </div>
                   <h3 className="mt-2 text-lg font-semibold font-[var(--font-heading)] group-hover:text-primary transition-colors">
                     {study.title}
                   </h3>
                   <p className="mt-2 text-sm text-grey leading-relaxed">{study.description}</p>
-                  <p className="mt-4 text-sm font-medium text-accent">{study.result}</p>
+                  <p className="mt-4 text-sm font-medium text-accent">{study.result} <span className="text-xs text-grey-dark">(illustrative)</span></p>
                 </div>
               </Link>
             ))}
@@ -268,40 +277,6 @@ export default function HomePage() {
             <Link href="/case-studies" className="btn-secondary">
               View All Case Studies →
             </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* Testimonials */}
-      <section className="section-padding">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <SectionHeading
-            label="Testimonials"
-            title="What Our Clients Say"
-            description="Hear directly from the businesses we've helped transform with AI automation."
-          />
-          <div className="grid md:grid-cols-3 gap-6">
-            {TESTIMONIALS.map((t) => (
-              <div key={t.name} className="rounded-xl border border-border bg-surface p-6 md:p-8 card-hover">
-                <div className="flex gap-1 mb-4">
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <svg key={i} className="w-4 h-4 text-primary" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                    </svg>
-                  ))}
-                </div>
-                <p className="text-sm text-grey leading-relaxed italic">&ldquo;{t.quote}&rdquo;</p>
-                <div className="mt-6 flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary text-sm font-semibold">
-                    {t.name[0]}
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-white">{t.name}</p>
-                    <p className="text-xs text-grey">{t.role}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
           </div>
         </div>
       </section>
@@ -321,7 +296,7 @@ export default function HomePage() {
               { question: "How long does implementation take?", answer: "Most projects are delivered within 4–8 weeks depending on complexity. Simple chatbots can be deployed in as little as 2 weeks." },
               { question: "What industries do you serve?", answer: "We work with healthcare, finance, real estate, hospitality, manufacturing, education, marketing agencies, e-commerce, and more." },
               { question: "Do you offer ongoing support?", answer: "Yes. All our solutions include post-launch support, monitoring, and optimization to ensure continuous performance." },
-              { question: "What's the ROI of AI automation?", answer: "Our clients typically see 60% cost savings and 3x improvement in response times within the first 3 months of deployment." },
+              { question: "What's the ROI of AI automation?", answer: "In illustrative scenarios, businesses can see up to 60% cost savings and 3x faster response times within the first 3 months of deployment. During discovery we model the ROI for your specific volumes and workflows, then track real results against agreed KPIs." },
               { question: "Can you integrate with our existing tools?", answer: "Absolutely. We integrate with popular CRMs, ERPs, communication platforms, and custom APIs to fit seamlessly into your workflow." },
               { question: "Is my data secure?", answer: "Yes. We follow enterprise-grade security practices including encryption, access controls, and compliance with GDPR and other regulations." },
               { question: "What makes Vyravo AI different?", answer: "We focus on measurable business outcomes, not just technology. Every solution is custom-built to your needs with transparent pricing and dedicated support." },

@@ -4,81 +4,75 @@ import { CTA } from "@/components/CTA";
 
 export const metadata: Metadata = {
   title: "Case Studies",
-  description: "Explore how Vyravo AI has transformed businesses with AI chatbots, voice agents, workflow automation, and custom AI solutions.",
+  description: "Sample case studies from Vyravo AI — illustrative implementations of AI chatbots, voice agents, workflow automation, and custom AI solutions with example outcomes.",
 };
 
 const caseStudies = [
   {
-    title: "AI Patient Engagement Platform for MedCare Hospitals",
+    title: "AI Patient Engagement Platform for a Multi-Specialty Hospital Group",
     industry: "Healthcare",
-    problem: "MedCare Hospitals struggled with high call volumes, appointment no-shows, and after-hours patient inquiries that overwhelmed their staff.",
+    problem: "A multi-specialty hospital group struggled with high call volumes, appointment no-shows, and after-hours patient inquiries that overwhelmed their staff.",
     solution: "We deployed an AI chatbot for 24/7 patient support, an AI voice agent for appointment confirmations, and automated patient intake workflows.",
     workflow: ["Patient sends inquiry via website/WhatsApp", "AI chatbot handles FAQ and triage", "Voice agent confirms appointments", "Data syncs to hospital EHR"],
     technologies: ["GPT-4 Fine-tuned Model", "Voice AI", "WhatsApp API", "HL7 FHIR Integration"],
     timeline: "6 weeks",
     results: ["85% reduction in response time", "40% decrease in no-shows", "60% reduction in administrative workload", "Significant annual cost savings"],
     roi: "320% projected ROI in first year",
-    testimonial: { name: "Dr. Rajesh Patel", role: "Director, MedCare Hospitals", quote: "The AI voice agent handles our appointment scheduling flawlessly. Patient satisfaction scores are up 40%." },
   },
   {
-    title: "AI Sales Pipeline for TechVenture Capital",
+    title: "AI Sales Pipeline for a B2B Investment Firm",
     industry: "Technology / Finance",
-    problem: "TechVenture Capital's sales team was spending 60% of their time on manual lead qualification and follow-ups, missing high-value opportunities.",
+    problem: "A B2B investment firm's sales team was spending 60% of their time on manual lead qualification and follow-ups, missing high-value opportunities.",
     solution: "We built an end-to-end AI sales automation system with intelligent lead scoring, personalized outreach sequences, and automated CRM updates.",
     workflow: ["Leads captured from multiple channels", "AI scores and qualifies leads", "Personalized email sequences triggered", "Sales team gets hot lead alerts"],
     technologies: ["Custom AI Model", "CRM Integration", "Email Automation", "Analytics Dashboard"],
     timeline: "5 weeks",
     results: ["3x increase in qualified leads", "70% faster lead response time", "45% improvement in conversion rate", "Sales team reclaimed 25 hours/week"],
     roi: "450% projected ROI in first year",
-    testimonial: { name: "Sarah Chen", role: "CEO, TechVenture Capital", quote: "Vyravo AI transformed our lead qualification process. Our conversion rate improved by 3x." },
   },
   {
-    title: "Workflow Automation for Global Logistics Inc.",
+    title: "Workflow Automation for a Global Logistics Company",
     industry: "Manufacturing / Logistics",
-    problem: "Global Logistics was drowning in manual data entry, order processing errors, and vendor communication delays that cost them hours and revenue.",
+    problem: "A global logistics company was drowning in manual data entry, order processing errors, and vendor communication delays that cost them hours and revenue.",
     solution: "We automated their order processing, inventory tracking, and vendor communication workflows with intelligent AI-powered systems.",
     workflow: ["Orders received via email/portal", "AI extracts and validates data", "Inventory automatically updated", "Vendor notifications dispatched"],
     technologies: ["Document AI", "Process Automation", "API Integrations", "Real-time Dashboard"],
     timeline: "8 weeks",
     results: ["200+ hours saved per month", "95% reduction in data entry errors", "50% faster order processing", "Substantial annual cost savings"],
     roi: "280% projected ROI in first year",
-    testimonial: { name: "Michael Torres", role: "COO, Global Logistics Inc.", quote: "Their workflow automation saved us 200+ hours per month. The ROI was visible within the first quarter." },
   },
   {
-    title: "AI Concierge for LuxStay Hotels",
+    title: "AI Concierge for a Boutique Hotel Chain",
     industry: "Hospitality",
-    problem: "LuxStay Hotels needed to provide consistent, multilingual guest support 24/7 while maximizing upsell opportunities during the guest journey.",
+    problem: "A boutique hotel chain needed to provide consistent, multilingual guest support 24/7 while maximizing upsell opportunities during the guest journey.",
     solution: "We built a multilingual AI concierge chatbot integrated with their property management system, capable of handling 80% of guest inquiries autonomously.",
     workflow: ["Guest sends message via app/SMS", "AI identifies language and intent", "Handles request or escalates to staff", "Upsell recommendations triggered contextually"],
     technologies: ["Multilingual NLP", "PMS Integration", "SMS/WhatsApp API", "Recommendation Engine"],
     timeline: "7 weeks",
     results: ["90% guest satisfaction score", "80% of inquiries resolved by AI", "25% increase in upsell revenue", "Staff freed for high-touch interactions"],
     roi: "350% projected ROI in first year",
-    testimonial: { name: "Elena Rodriguez", role: "GM, LuxStay Hotels", quote: "The AI concierge transformed our guest experience. Satisfaction scores have never been higher." },
   },
   {
-    title: "Enrollment Chatbot for EduFirst Academy",
+    title: "Enrollment Chatbot for a Higher-Education Institute",
     industry: "Education",
-    problem: "EduFirst Academy's enrollment team couldn't keep up with 1,000+ weekly inquiries, leading to delayed responses and lost prospective students.",
+    problem: "A higher-education institute's enrollment team couldn't keep up with 1,000+ weekly inquiries, leading to delayed responses and lost prospective students.",
     solution: "We deployed an intelligent enrollment chatbot that handles inquiries, qualifies prospects, schedules campus tours, and automates application follow-ups.",
     workflow: ["Prospect visits website", "Chatbot engages and qualifies", "Tour scheduled automatically", "Follow-up sequence initiated"],
     technologies: ["Conversational AI", "Calendar Integration", "CRM Sync", "Analytics"],
     timeline: "4 weeks",
     results: ["60% faster enrollment processing", "35% improvement in student engagement", "1,000+ inquiries handled weekly", "Meaningful annual cost reduction"],
     roi: "250% projected ROI in first year",
-    testimonial: { name: "Prof. David Kim", role: "Dean, EduFirst Academy", quote: "The enrollment chatbot handles the volume we never could manually. Our team can now focus on personal connections." },
   },
   {
-    title: "AI-Powered E-commerce Assistant for ShopSmart",
+    title: "AI-Powered E-commerce Assistant for an Online Retailer",
     industry: "E-commerce",
-    problem: "ShopSmart faced high cart abandonment rates, overwhelming support ticket volume, and missed opportunities for personalized product recommendations.",
+    problem: "An online retailer faced high cart abandonment rates, overwhelming support ticket volume, and missed opportunities for personalized product recommendations.",
     solution: "We built an AI shopping assistant with smart product recommendations, automated support, and proactive cart recovery via chat and email.",
     workflow: ["Customer browses products", "AI recommends based on behavior", "Abandoned cart triggers recovery", "Support handled automatically"],
     technologies: ["Recommendation AI", "Chat Integration", "Email Automation", "Behavior Analytics"],
     timeline: "5 weeks",
     results: ["35% reduction in cart abandonment", "25% increase in average order value", "80% of support tickets resolved by AI", "15% uplift in repeat purchases"],
     roi: "400% projected ROI in first year",
-    testimonial: { name: "Amanda Foster", role: "Head of Digital, ShopSmart", quote: "The AI assistant feels like having a dedicated salesperson for every single customer. Results speak for themselves." },
   },
 ];
 
@@ -93,11 +87,14 @@ export default function CaseStudiesPage() {
             Case Studies
           </span>
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-semibold tracking-tight leading-tight font-[var(--font-heading)]">
-            Real Solutions.{" "}
-            <span className="gradient-text">Real Results.</span>
+            Sample Case Studies.{" "}
+            <span className="gradient-text">Real Approaches.</span>
           </h1>
           <p className="mt-6 text-lg text-grey max-w-2xl mx-auto leading-relaxed">
-            See how our AI automation solutions have delivered measurable business impact across industries.
+            Illustrative implementations showing how our AI automation solutions work across industries — the workflows, technologies, and business impact you can expect.
+          </p>
+          <p className="mt-4 text-sm text-grey-dark max-w-2xl mx-auto leading-relaxed">
+            These are sample case studies based on realistic business scenarios and typical outcomes. Client details are anonymized or hypothetical; figures are illustrative projections, not verified results.
           </p>
         </div>
       </section>
@@ -109,12 +106,15 @@ export default function CaseStudiesPage() {
             <article key={cs.title} className="rounded-2xl border border-border bg-surface overflow-hidden">
               {/* Header */}
               <div className="p-8 md:p-10 bg-gradient-to-r from-primary/5 to-accent/5 border-b border-border">
-                <span className="text-xs font-medium text-primary uppercase tracking-wider">{cs.industry}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-primary uppercase tracking-wider">{cs.industry}</span>
+                  <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-white/5 border border-border text-grey-dark uppercase tracking-wider">Sample Case Study</span>
+                </div>
                 <h2 className="mt-2 text-xl md:text-2xl font-semibold font-[var(--font-heading)]">{cs.title}</h2>
                 <div className="mt-4 flex flex-wrap gap-4 text-sm text-grey">
-                  <span>Timeline: {cs.timeline}</span>
+                  <span>Example timeline: {cs.timeline}</span>
                   <span>•</span>
-                  <span>ROI: {cs.roi}</span>
+                  <span>Illustrative ROI: {cs.roi}</span>
                 </div>
               </div>
 
@@ -155,7 +155,7 @@ export default function CaseStudiesPage() {
                     </div>
                   </div>
                   <div>
-                    <h3 className="text-sm font-semibold text-accent uppercase tracking-wider mb-3">Results</h3>
+                    <h3 className="text-sm font-semibold text-accent uppercase tracking-wider mb-3">Example Results</h3>
                     <ul className="space-y-1">
                       {cs.results.map((r) => (
                         <li key={r} className="flex items-center gap-2 text-sm text-grey">
@@ -167,11 +167,6 @@ export default function CaseStudiesPage() {
                   </div>
                 </div>
 
-                {/* Testimonial */}
-                <div className="rounded-xl bg-bg border border-border p-6">
-                  <p className="text-sm text-grey italic leading-relaxed">&ldquo;{cs.testimonial.quote}&rdquo;</p>
-                  <p className="mt-3 text-sm font-medium text-white">{cs.testimonial.name} <span className="text-grey font-normal">— {cs.testimonial.role}</span></p>
-                </div>
               </div>
             </article>
           ))}

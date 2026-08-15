@@ -112,29 +112,8 @@ export const PROCESS_STEPS = [
 ];
 
 export const STATS = [
-  { value: "85%", label: "Reduction in Response Time" },
-  { value: "60%", label: "Cost Savings on Average" },
-  { value: "3x", label: "Increase in Lead Conversion" },
+  { value: "85%", label: "Reduction in Response Time*" },
+  { value: "60%", label: "Potential Cost Savings*" },
+  { value: "3x", label: "Potential Lift in Lead Conversion*" },
   { value: "24/7", label: "Always-On Availability" },
-];
-
-export const TESTIMONIALS = [
-  {
-    name: "Sarah Chen",
-    role: "CEO, TechVenture Capital",
-    quote: "Vyravo AI transformed our lead qualification process. What used to take our team hours now happens instantly with their AI chatbot. Our conversion rate improved by 3x.",
-    company: "TechVenture Capital",
-  },
-  {
-    name: "Dr. Rajesh Patel",
-    role: "Director, MedCare Hospitals",
-    quote: "The AI voice agent handles our appointment scheduling flawlessly. Patient satisfaction scores are up 40% and our staff can focus on what matters most — patient care.",
-    company: "MedCare Hospitals",
-  },
-  {
-    name: "Michael Torres",
-    role: "COO, Global Logistics Inc.",
-    quote: "Their workflow automation saved us 200+ hours per month. The ROI was visible within the first quarter. Truly enterprise-grade quality.",
-    company: "Global Logistics Inc.",
-  },
 ];

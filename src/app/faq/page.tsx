@@ -43,7 +43,7 @@ const faqCategories = [
     faqs: [
       { question: "What processes can be automated?", answer: "We automate data entry, document processing, email workflows, report generation, inventory management, order processing, compliance checks, and any repetitive business process." },
       { question: "Can you integrate with our existing tools?", answer: "Yes. We integrate with popular CRMs (Salesforce, HubSpot), ERPs, communication platforms (Slack, Teams), and custom APIs." },
-      { question: "How much time can automation save?", answer: "Our clients typically save 200+ hours per month by automating manual processes. The exact savings depend on the volume and complexity of your workflows." },
+      { question: "How much time can automation save?", answer: "As an illustrative example, a mid-size operation can save 200+ hours per month by automating manual processes. Your exact savings depend on the volume and complexity of your workflows — we model them during the discovery call." },
       { question: "Is there a risk of errors with automation?", answer: "Automation significantly reduces human error. Our systems include validation checks and exception handling to ensure accuracy and reliability." },
     ],
   },

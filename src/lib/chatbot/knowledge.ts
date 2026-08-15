@@ -95,7 +95,7 @@ export const COMPANY_KNOWLEDGE = {
     { q: "Can you integrate with our existing tools?", a: "Absolutely. We integrate with popular CRMs, ERPs, communication platforms, and custom APIs." },
     { q: "Is my data secure?", a: "Yes. We follow enterprise-grade security practices including encryption, access controls, and GDPR compliance." },
     { q: "Do you work with small businesses?", a: "Yes! We work with startups, SMEs, and enterprises. Our solutions scale with your business." },
-    { q: "What's the ROI of AI automation?", a: "Our clients typically see 60% cost savings and 3x improvement in response times within 3 months." },
+    { q: "What's the ROI of AI automation?", a: "In illustrative scenarios, businesses can see up to 60% cost savings and 3x faster response times within 3 months. Actual results depend on your volumes and workflows — we model the ROI for your specific situation during the discovery call." },
   ],
 
   differentiators: [
@@ -146,15 +146,15 @@ export const INDUSTRY_RECOMMENDATIONS: Record<string, { services: string[]; exam
 };
 
 export const OBJECTION_RESPONSES: Record<string, string> = {
-  expensive: "I understand budget is important. Our pricing is customized based on scope, and many clients see ROI within the first quarter. The cost of NOT automating—lost time, missed leads, human errors—often exceeds the investment. Would you like to discuss a solution that fits your budget?",
+  expensive: "I understand budget is important. Our pricing is customized based on scope, and businesses commonly see ROI within the first quarter. The cost of NOT automating—lost time, missed leads, human errors—often exceeds the investment. Would you like to discuss a solution that fits your budget?",
   
-  small: "Great news—AI automation isn't just for big companies anymore. Many of our clients are small businesses and startups. We design scalable solutions that grow with you. What's a repetitive task that takes up most of your time?",
+  small: "Great news—AI automation isn't just for big companies anymore. We design scalable solutions for businesses of every size, including small businesses and startups. What's a repetitive task that takes up most of your time?",
   
   "don't need": "I hear you. Many businesses don't realize how much time is spent on repetitive tasks until they map it out. Things like answering the same questions, manual data entry, or following up on leads add up. If you had 10 extra hours a week, what would you focus on?",
   
   "have software": "That's great! We don't replace your existing software—we enhance it. Our AI solutions integrate with your current tools to automate the manual work between them. What tools are you currently using?",
   
-  "no time": "Totally understand—you're busy running your business. That's exactly why automation helps. Once set up, it runs 24/7 without you. Our discovery call is just 30 minutes, and many clients say it's the most valuable half hour they've spent. Would that work for you?",
+  "no time": "Totally understand—you're busy running your business. That's exactly why automation helps. Once set up, it runs 24/7 without you. Our discovery call is just 30 minutes, designed to be the most valuable half hour you'll spend on automation. Would that work for you?",
   
   "think about it": "Of course, take your time. While you're considering, would it help if I shared some information about how businesses similar to yours have benefited? Or I can send you a quick summary of what we discussed.",
 };

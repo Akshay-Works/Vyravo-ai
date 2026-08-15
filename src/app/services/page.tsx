@@ -103,7 +103,7 @@ export default function ServicesPage() {
           <Accordion
             items={[
               { question: "How do I know which service is right for my business?", answer: "Book a free discovery call and our team will analyze your business needs and recommend the best AI solution for your specific use case and budget." },
-              { question: "Can I combine multiple services?", answer: "Absolutely. Many clients use a combination of AI chatbots with workflow automation or voice agents with sales automation for maximum impact." },
+              { question: "Can I combine multiple services?", answer: "Absolutely. Many businesses combine AI chatbots with workflow automation, or voice agents with sales automation, for maximum impact." },
               { question: "What if I need something not listed here?", answer: "Our Custom AI Solutions service covers everything from computer vision to predictive analytics. If you can imagine it, we can likely build it." },
               { question: "Do you offer maintenance after launch?", answer: "Yes. All projects include post-launch support, and we offer ongoing maintenance packages to keep your AI solution performing optimally." },
               { question: "What technologies do you use?", answer: "We leverage cutting-edge AI models like GPT-4, Claude, and custom fine-tuned models, deployed on secure cloud infrastructure with enterprise-grade reliability." },

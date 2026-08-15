@@ -174,8 +174,9 @@ export default function IndustriesPage() {
                       <span key={s} className="text-xs px-2.5 py-1 rounded-full bg-primary/10 text-primary border border-primary/20">{s}</span>
                     ))}
                   </div>
-                  <h3 className="text-sm font-semibold text-white uppercase tracking-wider mb-2 mt-4">Business Impact</h3>
+                  <h3 className="text-sm font-semibold text-white uppercase tracking-wider mb-2 mt-4">Potential Business Impact</h3>
                   <p className="text-sm text-accent font-medium">{ind.impact}</p>
+                  <p className="text-[10px] text-grey-dark mt-1">Illustrative outcomes based on typical automation scenarios</p>
                   <a href={SITE_LINKS.discoveryCall} target="_blank" rel="noopener noreferrer" className="btn-primary text-xs mt-4 py-2 px-4">
                     Get Started →
                   </a>
