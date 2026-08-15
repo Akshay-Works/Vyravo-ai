@@ -64,15 +64,14 @@ async function hsRequest(path: string, method: string, body?: unknown): Promise<
 // ---------------------------------------------------------------------------
 
 const CUSTOM_PROPERTIES: { name: string; label: string; type: string; fieldType: string }[] = [
-  { name: "vyravo_industry", label: "Industry", type: "string", fieldType: "text" },
-  { name: "vyravo_company_size", label: "Company Size", type: "string", fieldType: "text" },
-  { name: "vyravo_budget_range", label: "Budget Range", type: "string", fieldType: "text" },
-  { name: "vyravo_timeline", label: "Timeline", type: "string", fieldType: "text" },
-  { name: "vyravo_lead_score", label: "Lead Score", type: "number", fieldType: "number" },
-  { name: "vyravo_lead_category", label: "Lead Category", type: "string", fieldType: "text" },
-  { name: "vyravo_challenges", label: "Biggest Challenge", type: "string", fieldType: "textarea" },
-  { name: "vyravo_goals", label: "Automation Goals", type: "string", fieldType: "textarea" },
-  { name: "vyravo_source", label: "Lead Source", type: "string", fieldType: "text" },
+  { name: "vyravo_company_size", label: "Vyravo Company Size", type: "string", fieldType: "text" },
+  { name: "vyravo_budget_range", label: "Vyravo Budget Range", type: "string", fieldType: "text" },
+  { name: "vyravo_timeline", label: "Vyravo Timeline", type: "string", fieldType: "text" },
+  { name: "vyravo_lead_score", label: "Vyravo Lead Score", type: "number", fieldType: "number" },
+  { name: "vyravo_lead_category", label: "Vyravo Lead Category", type: "string", fieldType: "text" },
+  { name: "vyravo_challenges", label: "Vyravo Biggest Challenge", type: "string", fieldType: "textarea" },
+  { name: "vyravo_goals", label: "Vyravo Automation Goals", type: "string", fieldType: "textarea" },
+  { name: "vyravo_source", label: "Vyravo Lead Source", type: "string", fieldType: "text" },
 ];
 
 let customPropsState: "unknown" | "available" | "unavailable" = "unknown";
@@ -87,8 +86,9 @@ async function ensureCustomProperties(): Promise<boolean> {
           groupName: "contactinformation",
         });
       } catch (e: any) {
-        // 409 = already exists (fine). Anything else = property API unavailable.
-        if (!String(e?.message || "").includes("(409)")) throw e;
+        const msg = String(e?.message || "");
+        // 409 = already exists, 400 label/property conflict = effectively exists.
+        if (!msg.includes("(409)") && !msg.includes("NON_UNIQUE") && !msg.includes("PropertyValidationError")) throw e;
       }
     }
     customPropsState = "available";
@@ -113,8 +113,8 @@ function splitName(fullName?: string | null): { firstName?: string; lastName?: s
 }
 
 export async function findContactByEmail(email: string): Promise<{ id: string; properties: Record<string, string> } | null> {
-  const result = await hsRequest("/crm/v3/contacts/search", "POST", {
-    filterGroups: [{ filters: [{ propertyName: "email", value: email }] }],
+  const result = await hsRequest("/crm/v3/objects/contacts/search", "POST", {
+    filterGroups: [{ filters: [{ propertyName: "email", value: email, operator: "EQ" }] }],
     limit: 1,
   });
   const contact = result?.results?.[0];
@@ -131,9 +131,9 @@ function buildContactProperties(lead: LeadSyncData, includeCustom: boolean): Rec
   if (lead.businessName) props.company = lead.businessName;
   if (lead.businessWebsite) props.website = lead.businessWebsite;
   if (lead.country) props.country = lead.country;
+  if (lead.industry) props.industry = lead.industry;
 
   if (includeCustom) {
-    if (lead.industry) props.vyravo_industry = lead.industry;
     if (lead.companySize) props.vyravo_company_size = lead.companySize;
     if (lead.budgetRange) props.vyravo_budget_range = lead.budgetRange;
     if (lead.timeline) props.vyravo_timeline = lead.timeline;
@@ -187,7 +187,7 @@ export async function resolveFirstExistingStage(labels: string[]): Promise<strin
 }
 
 async function findDealForContact(contactId: string): Promise<string | null> {
-  const data = await hsRequest(`/crm/v3/contacts/${contactId}/associations/deals`, "GET");
+  const data = await hsRequest(`/crm/v4/objects/contacts/${contactId}/associations/deals`, "GET");
   const first = data?.results?.[0];
   return first?.id || null;
 }
@@ -220,11 +220,11 @@ export async function syncLeadToHubSpot(
     let action: "created" | "updated";
 
     if (existing) {
-      await hsRequest(`/crm/v3/contacts/${existing.id}`, "PATCH", { properties: props });
+      await hsRequest(`/crm/v3/objects/contacts/${existing.id}`, "PATCH", { properties: props });
       contactId = existing.id;
       action = "updated";
     } else {
-      const created = await hsRequest("/crm/v3/contacts", "POST", { properties: props });
+      const created = await hsRequest("/crm/v3/objects/contacts", "POST", { properties: props });
       contactId = created.id;
       action = "created";
     }
@@ -241,7 +241,7 @@ export async function syncLeadToHubSpot(
         const patch: Record<string, string> = {};
         if (stageId) patch.dealstage = stageId;
         if (Object.keys(patch).length > 0) {
-          await hsRequest(`/crm/v3/deals/${existingDealId}`, "PATCH", { properties: patch });
+          await hsRequest(`/crm/v3/objects/deals/${existingDealId}`, "PATCH", { properties: patch });
         }
         result.dealId = existingDealId;
       } else {
@@ -250,7 +250,7 @@ export async function syncLeadToHubSpot(
         if (pipelineId) dealProps.pipeline = pipelineId;
         if (stageId) dealProps.dealstage = stageId;
         if (lead.qualificationSummary) dealProps.description = lead.qualificationSummary;
-        const deal = await hsRequest("/crm/v3/deals", "POST", {
+        const deal = await hsRequest("/crm/v3/objects/deals", "POST", {
           properties: dealProps,
           associations: [
             {
@@ -296,7 +296,7 @@ export async function updateDealStageForEmail(
     const stageId = await resolveFirstExistingStage(candidateLabels);
     if (!stageId) return { ok: false, moved: false, error: "No matching pipeline stage exists" };
 
-    await hsRequest(`/crm/v3/deals/${dealId}`, "PATCH", { properties: { dealstage: stageId } });
+    await hsRequest(`/crm/v3/objects/deals/${dealId}`, "PATCH", { properties: { dealstage: stageId } });
     return { ok: true, moved: true };
   } catch (error) {
     console.error("HubSpot deal stage update failed:", error);
