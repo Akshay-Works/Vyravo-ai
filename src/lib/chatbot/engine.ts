@@ -142,7 +142,7 @@ export function generateResponse(
     case "chatbot":
       const chatbotService = COMPANY_KNOWLEDGE.services.find(s => s.name === "AI Chatbots")!;
       return {
-        message: `**AI Chatbots** are one of our most popular solutions! 🤖\n\n${chatbotService.description}\n\n**Benefits:**\n${chatbotService.benefits.map(b => `• ${b}`).join("\n")}\n\n**Starting from:** ${chatbotService.startingPrice}\n\nWe can deploy chatbots on your website, WhatsApp, Facebook Messenger, Slack, and more.\n\nWhat kind of customer interactions would you like to automate?`,
+        message: `**AI Chatbots** are one of our most popular solutions! 🤖\n\n${chatbotService.description}\n\n**Benefits:**\n${chatbotService.benefits.map(b => `• ${b}`).join("\n")}\n\n**Pricing:** Customized to your requirements — we\'ll outline a tailored quote during a discovery call.\n\nWe can deploy chatbots on your website, WhatsApp, Facebook Messenger, Slack, and more.\n\nWhat kind of customer interactions would you like to automate?`,
         suggestedActions: [
           { id: "example", label: "Show me examples", action: "message", value: "Show me chatbot examples" },
           { id: "pricing", label: "💰 Pricing details", action: "message", value: "How much does a chatbot cost?" },
@@ -154,7 +154,7 @@ export function generateResponse(
     case "voiceAgent":
       const voiceService = COMPANY_KNOWLEDGE.services.find(s => s.name === "AI Voice Agents")!;
       return {
-        message: `**AI Voice Agents** can revolutionize how you handle calls! 🎙️\n\n${voiceService.description}\n\n**Benefits:**\n${voiceService.benefits.map(b => `• ${b}`).join("\n")}\n\n**Starting from:** ${voiceService.startingPrice}\n\nOur voice agents sound natural—callers often can't tell they're speaking with AI.\n\nWhat type of calls do you handle most? Inbound support or outbound follow-ups?`,
+        message: `**AI Voice Agents** can revolutionize how you handle calls! 🎙️\n\n${voiceService.description}\n\n**Benefits:**\n${voiceService.benefits.map(b => `• ${b}`).join("\n")}\n\n**Pricing:** Customized to your requirements — we\'ll outline a tailored quote during a discovery call.\n\nOur voice agents sound natural—callers often can't tell they're speaking with AI.\n\nWhat type of calls do you handle most? Inbound support or outbound follow-ups?`,
         suggestedActions: generateBookingActions(),
         intent,
       };
@@ -162,7 +162,7 @@ export function generateResponse(
     case "workflow":
       const workflowService = COMPANY_KNOWLEDGE.services.find(s => s.name === "AI Workflow Automation")!;
       return {
-        message: `**AI Workflow Automation** eliminates repetitive manual work! ⚡\n\n${workflowService.description}\n\n**Benefits:**\n${workflowService.benefits.map(b => `• ${b}`).join("\n")}\n\n**Starting from:** ${workflowService.startingPrice}\n\nWe integrate with tools like HubSpot, Salesforce, Slack, Google Sheets, and custom APIs.\n\nWhat repetitive tasks consume most of your team's time?`,
+        message: `**AI Workflow Automation** eliminates repetitive manual work! ⚡\n\n${workflowService.description}\n\n**Benefits:**\n${workflowService.benefits.map(b => `• ${b}`).join("\n")}\n\n**Pricing:** Customized to your requirements — we\'ll outline a tailored quote during a discovery call.\n\nWe integrate with tools like HubSpot, Salesforce, Slack, Google Sheets, and custom APIs.\n\nWhat repetitive tasks consume most of your team's time?`,
         suggestedActions: generateBookingActions(),
         intent,
       };
@@ -170,14 +170,14 @@ export function generateResponse(
     case "sales":
       const salesService = COMPANY_KNOWLEDGE.services.find(s => s.name === "AI Sales Automation")!;
       return {
-        message: `**AI Sales Automation** helps you close more deals without the manual grind! 📈\n\n${salesService.description}\n\n**Benefits:**\n${salesService.benefits.map(b => `• ${b}`).join("\n")}\n\n**Starting from:** ${salesService.startingPrice}\n\nWe can automate lead scoring, personalized follow-ups, CRM updates, and meeting scheduling.\n\nHow are you currently managing your sales pipeline?`,
+        message: `**AI Sales Automation** helps you close more deals without the manual grind! 📈\n\n${salesService.description}\n\n**Benefits:**\n${salesService.benefits.map(b => `• ${b}`).join("\n")}\n\n**Pricing:** Customized to your requirements — we\'ll outline a tailored quote during a discovery call.\n\nWe can automate lead scoring, personalized follow-ups, CRM updates, and meeting scheduling.\n\nHow are you currently managing your sales pipeline?`,
         suggestedActions: generateBookingActions(),
         intent,
       };
 
     case "pricing":
       return {
-        message: `Our pricing is customized based on project scope—no generic packages here. Here are starting prices:\n\n• **AI Chatbots** — from $2,500\n• **Workflow Automation** — from $3,000\n• **AI Voice Agents** — from $4,000\n• **Sales Automation** — from $3,500\n• **AI Consulting** — from $1,500\n• **Custom Solutions** — from $5,000\n\nEvery project includes:\n✓ Free discovery call\n✓ Custom development\n✓ 30-day post-launch support\n✓ Full code ownership\n\nThe best way to get an accurate quote is through a quick discovery call. Would you like to book one?`,
+        message: `Great question! Vyravo AI solutions are customized based on your business requirements, workflows, integrations, and implementation complexity—no one-size-fits-all packages here.\n\nEvery project includes:\n✓ Free discovery call\n✓ Custom development\n✓ 30-day post-launch support\n✓ Full code ownership\n\nI can help you book a discovery call to discuss your requirements and get a tailored proposal. Would you like to book one?`,
         suggestedActions: generateBookingActions(),
         intent,
       };

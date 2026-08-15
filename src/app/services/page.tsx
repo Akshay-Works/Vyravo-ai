@@ -62,7 +62,7 @@ export default function ServicesPage() {
                   <a href={SITE_LINKS.discoveryCall} target="_blank" rel="noopener noreferrer" className="btn-primary text-sm">
                     Get Started
                   </a>
-                  <span className="text-sm text-grey">From {service.startingPrice}</span>
+                  <span className="text-sm text-grey">Tailored to your business</span>
                 </div>
               </div>
               <div className="rounded-2xl bg-surface border border-border aspect-video flex items-center justify-center">

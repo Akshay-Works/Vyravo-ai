@@ -106,7 +106,7 @@ export default function HomePage() {
                   ))}
                 </div>
                 <p className="mt-5 text-sm font-medium text-primary">
-                  Starting from {service.startingPrice} →
+                  Custom Solution →
                 </p>
               </Link>
             ))}
@@ -326,7 +326,7 @@ export default function HomePage() {
               { question: "Is my data secure?", answer: "Yes. We follow enterprise-grade security practices including encryption, access controls, and compliance with GDPR and other regulations." },
               { question: "What makes Vyravo AI different?", answer: "We focus on measurable business outcomes, not just technology. Every solution is custom-built to your needs with transparent pricing and dedicated support." },
               { question: "Do you offer a free consultation?", answer: "Yes! We offer a free 30-minute discovery call where we analyze your business needs and propose an AI automation strategy." },
-              { question: "What is the cost of your services?", answer: "Pricing is customized based on project scope. AI chatbots start at $2,500 and workflow automation starts at $3,000. Book a discovery call for a detailed quote." },
+              { question: "What is the cost of your services?", answer: "Pricing is customized based on your business requirements, workflows, integrations, and implementation complexity. Book a discovery call and we'll assess your needs and provide a tailored proposal." },
               { question: "Can I see a demo before starting?", answer: "Yes. During the discovery call, we can walk you through relevant demos and case studies that match your industry and use case." },
               { question: "Do you work with startups?", answer: "Yes! We work with startups, SMEs, and enterprises. Our solutions are designed to scale with your business as it grows." },
               { question: "What technologies do you use?", answer: "We use state-of-the-art AI frameworks including GPT-4, Claude, custom fine-tuned models, along with robust cloud infrastructure." },

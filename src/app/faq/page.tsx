@@ -21,7 +21,7 @@ const faqCategories = [
   {
     category: "Pricing & Payments",
     faqs: [
-      { question: "How much do your services cost?", answer: "Pricing is customized based on project scope. AI Chatbots start at $2,500, Workflow Automation at $3,000, Voice Agents at $4,000, Sales Automation at $3,500, Consulting at $1,500, and Custom Solutions at $5,000." },
+      { question: "How much do your services cost?", answer: "Pricing is customized based on your business requirements, workflows, integrations, and implementation complexity — we don't use one-size-fits-all packages. Book a free discovery call and we'll assess your needs and provide a tailored proposal." },
       { question: "Why is pricing customized?", answer: "AI solutions vary significantly in complexity, integrations, and scope. Custom pricing ensures you pay for exactly what you need — no generic packages or hidden fees." },
       { question: "Do you offer payment plans?", answer: "Yes. For larger projects, we typically structure payments across milestones: 40% upfront, 30% at midpoint, and 30% upon delivery." },
       { question: "Are there any hidden fees?", answer: "No. We provide a detailed, transparent quote before starting any project. You'll know exactly what you're paying for from day one." },

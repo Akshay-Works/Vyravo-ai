@@ -53,7 +53,6 @@ export const SERVICES = [
     description: "Intelligent conversational agents that handle customer queries 24/7, qualify leads, and deliver instant support across all channels.",
     icon: "chatbot",
     features: ["24/7 Customer Support", "Lead Qualification", "Multi-language", "Omnichannel"],
-    startingPrice: "$2,500",
   },
   {
     title: "AI Workflow Automation",
@@ -61,7 +60,6 @@ export const SERVICES = [
     description: "End-to-end automation of repetitive business processes, from data entry to complex multi-step workflows.",
     icon: "workflow",
     features: ["Process Automation", "Data Pipeline", "Error Reduction", "Scalable"],
-    startingPrice: "$3,000",
   },
   {
     title: "AI Voice Agents",
@@ -69,7 +67,6 @@ export const SERVICES = [
     description: "Natural-sounding AI voice assistants that handle inbound and outbound calls, appointments, and customer interactions.",
     icon: "voice",
     features: ["Inbound Calls", "Outbound Calls", "Appointment Booking", "Natural Voice"],
-    startingPrice: "$4,000",
   },
   {
     title: "AI Sales Automation",
@@ -77,7 +74,6 @@ export const SERVICES = [
     description: "Automate your entire sales pipeline from lead generation to follow-ups with intelligent AI-powered systems.",
     icon: "sales",
     features: ["Lead Scoring", "Auto Follow-up", "CRM Integration", "Pipeline Management"],
-    startingPrice: "$3,500",
   },
   {
     title: "AI Consulting",
@@ -85,7 +81,6 @@ export const SERVICES = [
     description: "Strategic guidance on AI adoption, implementation roadmaps, and technology selection for your organization.",
     icon: "consulting",
     features: ["Strategy", "Roadmap", "Tech Selection", "ROI Analysis"],
-    startingPrice: "$1,500",
   },
   {
     title: "Custom AI Solutions",
@@ -93,7 +88,6 @@ export const SERVICES = [
     description: "Bespoke AI systems tailored to your unique business needs, from computer vision to predictive analytics.",
     icon: "custom",
     features: ["Custom Models", "API Integration", "Tailored Solutions", "Full Ownership"],
-    startingPrice: "$5,000",
   },
 ];
 
