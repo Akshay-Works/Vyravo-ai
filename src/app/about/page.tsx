@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import { SectionHeading } from "@/components/SectionHeading";
 import { CTA } from "@/components/CTA";
 import { STATS, INDUSTRIES } from "@/lib/constants";
@@ -85,12 +86,18 @@ export default function AboutPage() {
       <section className="section-padding">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid md:grid-cols-2 gap-12 items-center">
-            <div className="rounded-2xl bg-surface border border-border aspect-square flex items-center justify-center">
-              <div className="text-center">
-                <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center text-primary text-3xl font-semibold mx-auto">
-                  A
-                </div>
-                <p className="mt-4 text-sm text-grey">Founder & CEO</p>
+            <div className="rounded-2xl bg-surface border border-border aspect-square flex items-center justify-center relative overflow-hidden">
+              <Image
+                src="/images/founder/akshay-navale.png"
+                alt="Akshay Navale, Founder & CEO of Vyravo AI"
+                fill
+                className="object-cover object-[center_22%]"
+                sizes="(max-width: 768px) 100vw, 400px"
+                priority
+              />
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-bg via-bg/70 to-transparent p-5 pt-10">
+                <p className="text-white font-semibold text-lg leading-tight">Akshay Navale</p>
+                <p className="text-primary text-xs uppercase tracking-[0.15em] font-medium mt-1">Founder & CEO</p>
               </div>
             </div>
             <div>
