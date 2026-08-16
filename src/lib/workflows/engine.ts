@@ -174,6 +174,26 @@ async function dispatchWorkflow(eventType: string, payload: any): Promise<Record
 async function handleLeadCreated(payload: any) {
   await logActivityFor(payload, "lead", "New lead received", payload.metadata?.source ? `Lead source: ${payload.metadata.source}` : "A new lead entered the CRM.");
   await trackEvent("lead_created", { leadId: payload.leadId, clientId: payload.clientId, metadata: payload.metadata });
+  
+  // Schedule a follow-up reminder if no call booked within 2 days
+  // (The follow-up is queued as a future event in the email_queue table)
+  if (payload.metadata?.email) {
+    try {
+      const { emailQueue } = await import("@/db/schema");
+      const { db } = await import("@/db");
+      await db.insert(emailQueue).values({
+        emailType: "lead_followup",
+        scheduledFor: new Date(Date.now() + 2 * 86400000), // 2 days later
+        status: "pending",
+        templateData: { to: payload.metadata.email, subject: "Following up — your Vyravo AI inquiry", message: "Just checking in to see if you'd like to schedule a discovery call." },
+        leadId: payload.leadId || null,
+        clientId: payload.clientId || null,
+      });
+    } catch (e) {
+      console.error("Lead follow-up scheduling failed:", e);
+    }
+  }
+  
   return { ok: true };
 }
 
