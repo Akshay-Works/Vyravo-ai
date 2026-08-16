@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { rateLimit, clientIp } from "@/lib/knowledge-base/rate-limit";
 import { getPortalSession, verifyPassword, createClientSession, sessionCookieName, sessionTtlSeconds, hashPassword } from "@/lib/portal/auth";
 import { registerClient } from "@/lib/portal/engine";
+import { emitEvent } from "@/lib/workflows/engine";
 import { cookies } from "next/headers";
 import { pool } from "@/db";
 
@@ -39,6 +40,7 @@ export async function POST(request: NextRequest) {
       sameSite: "lax", path: "/", maxAge: sessionTtlSeconds(),
     });
 
+    try { await emitEvent("portal_login", { clientId: Number(user.client_id), metadata: { userId: user.id } }); } catch {}
     return Response.json({ success: true, name: user.name, role: user.role });
   } catch (e) {
     console.error("Portal login error:", e);

@@ -10,7 +10,8 @@
     "kb:setup": "tsx scripts/kb-setup.ts",
     "kb:reembed": "tsx scripts/kb-reembed.ts",
     "proposal:setup": "tsx scripts/proposal-setup.ts",
-    "portal:setup": "tsx scripts/portal-setup.ts"
+    "portal:setup": "tsx scripts/portal-setup.ts",
+    "workflow:setup": "tsx scripts/workflow-setup.ts"
   },
   "dependencies": {
     "@react-pdf/renderer": "^4.6.1",

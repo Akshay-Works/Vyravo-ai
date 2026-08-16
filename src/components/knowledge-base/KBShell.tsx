@@ -6,6 +6,8 @@ import { Logo } from "@/components/Logo";
 
 const NAV_ITEMS = [
   { href: "/admin/analytics", label: "Analytics", icon: "📊" },
+  { href: "/admin/crm/clients", label: "CRM", icon: "👥" },
+  { href: "/admin/workflows", label: "Workflows", icon: "⚡" },
   { href: "/admin/portal/clients", label: "Portal Clients", icon: "👥" },
   { href: "/admin/proposals", label: "Proposals", icon: "📄" },
   { href: "/admin/knowledge-base", label: "KB Dashboard", icon: "📊" },

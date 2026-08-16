@@ -3,6 +3,7 @@ import { isAdminAuthenticated } from "@/lib/knowledge-base/auth";
 import { rateLimit, clientIp, rateLimitResponse } from "@/lib/knowledge-base/rate-limit";
 import { getProposal, setProposalStatus, recordEvent } from "@/lib/proposals/engine";
 import { buildProposalEmailPayload, sendProposalEmail } from "@/lib/proposals/email";
+import { emitEvent } from "@/lib/workflows/engine";
 
 export const dynamic = "force-dynamic";
 
@@ -50,6 +51,7 @@ export async function POST(
     }
 
     await recordEvent(proposalId, "sent", { emailed: Boolean(p.clientEmail) });
+    try { await emitEvent("proposal_sent", { proposalId, clientId: p.clientId || undefined, metadata: { title: p.title, value: p.total } }); } catch {}
 
     return Response.json({
       success: true,

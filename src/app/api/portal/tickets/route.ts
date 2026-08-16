@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { getPortalSession } from "@/lib/portal/auth";
 import { getClientTickets, createTicket } from "@/lib/portal/engine";
+import { emitEvent } from "@/lib/workflows/engine";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +30,7 @@ export async function POST(request: NextRequest) {
       priority: body.priority,
       projectId: body.projectId ? Number(body.projectId) : undefined,
     });
+    try { await emitEvent("support_ticket_created", { clientId: session.clientId, metadata: { title: body.title, ticketId: ticket.id } }); } catch {}
     return Response.json({ success: true, ticket }, { status: 201 });
   } catch (e) {
     console.error("Portal create ticket error:", e);

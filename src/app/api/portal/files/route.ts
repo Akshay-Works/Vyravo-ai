@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { getPortalSession } from "@/lib/portal/auth";
 import { getClientFiles, uploadFile } from "@/lib/portal/engine";
+import { emitEvent } from "@/lib/workflows/engine";
 import { promises as fs } from "fs";
 import path from "path";
 
@@ -59,6 +60,7 @@ export async function POST(request: NextRequest) {
       projectId: formData.get("projectId") ? Number(formData.get("projectId")) : undefined,
       uploadedBy: session.userId,
     });
+    try { await emitEvent("deliverable_uploaded", { clientId: session.clientId, projectId: formData.get("projectId") ? Number(formData.get("projectId")) : undefined, metadata: { name: file.name, originalName: file.name } }); } catch {}
     return Response.json({ success: true, file: result }, { status: 201 });
   } catch (e) {
     console.error("Portal upload error:", e);

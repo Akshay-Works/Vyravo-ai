@@ -2,6 +2,7 @@ import { generateResponse, getWelcomeMessage } from "@/lib/chatbot/engine";
 import type { ConversationContext, ChatMessage } from "@/lib/chatbot/types";
 import { syncLeadToHubSpot, isHubSpotConfigured } from "@/lib/integrations/hubspot";
 import { tryKnowledgeBaseAnswer } from "@/lib/knowledge-base/chat-integration";
+import { emitEvent } from "@/lib/workflows/engine";
 
 export const dynamic = "force-dynamic";
 
@@ -83,6 +84,9 @@ export async function POST(request: Request) {
           { dealStageLabel: "Prospecting" }
         );
         leadCaptured = result.ok;
+        if (leadCaptured) {
+          try { await emitEvent("lead_created", { metadata: { source: "chatbot", email: leadEmail } }); } catch {}
+        }
       } catch (error) {
         console.error("Chatbot HubSpot sync failed:", error);
       }

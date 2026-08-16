@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { rateLimit, clientIp, rateLimitResponse } from "@/lib/knowledge-base/rate-limit";
 import { getProposalByToken, recordClientDecision } from "@/lib/proposals/engine";
+import { emitEvent } from "@/lib/workflows/engine";
 
 export const dynamic = "force-dynamic";
 
@@ -44,6 +45,7 @@ export async function POST(
       console.warn("CRM sync on accept failed:", e);
     }
 
+    try { await emitEvent("proposal_accepted", { proposalId: p.id, clientId: p.clientId || undefined, metadata: { name, email: body.email } }); } catch {}
     return Response.json({ success: true, message: "Thank you — the proposal has been accepted." });
   } catch (e) {
     console.error("Accept proposal error:", e);
