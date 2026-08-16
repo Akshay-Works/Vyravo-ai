@@ -94,9 +94,47 @@ export default function ContactPage() {
                 </div>
               </div>
 
-              {/* Map placeholder */}
-              <div className="rounded-2xl border border-border bg-surface overflow-hidden h-48 flex items-center justify-center">
-                <p className="text-sm text-grey">📍 Serving businesses worldwide</p>
+              {/* Serving Clients Worldwide — clean world map */}
+              <div className="rounded-2xl border border-border bg-surface overflow-hidden">
+                <div className="relative h-56 sm:h-64 w-full bg-gradient-to-br from-primary/5 via-transparent to-accent/5 flex items-center justify-center">
+                  <svg className="absolute inset-0 w-full h-full" viewBox="0 0 1200 600" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <defs>
+                      <radialGradient id="glowMap" cx="50%" cy="50%" r="60%">
+                        <stop offset="0%" stopColor="#3B82F6" stopOpacity="0.12" />
+                        <stop offset="100%" stopColor="#3B82F6" stopOpacity="0" />
+                      </radialGradient>
+                    </defs>
+                    <ellipse cx="600" cy="300" rx="520" ry="250" fill="url(#glowMap)" />
+                    <g fill="#3B82F6" opacity="0.55">
+                      <circle cx="220" cy="150" r="4"/><circle cx="245" cy="140" r="3"/><circle cx="200" cy="170" r="3.5"/>
+                      <circle cx="265" cy="160" r="3"/><circle cx="235" cy="185" r="3"/><circle cx="290" cy="150" r="2.5"/>
+                      <circle cx="260" cy="205" r="3"/><circle cx="305" cy="180" r="2.5"/><circle cx="210" cy="195" r="2.5"/>
+                      <circle cx="330" cy="300" r="3.5"/><circle cx="320" cy="330" r="3"/><circle cx="340" cy="355" r="3"/>
+                      <circle cx="335" cy="385" r="2.5"/><circle cx="325" cy="410" r="2.5"/><circle cx="350" cy="315" r="2.5"/>
+                      <circle cx="590" cy="150" r="3.5"/><circle cx="615" cy="165" r="3"/><circle cx="570" cy="175" r="2.5"/>
+                      <circle cx="635" cy="155" r="2.5"/><circle cx="600" cy="190" r="2.5"/><circle cx="660" cy="170" r="2.5"/>
+                      <circle cx="610" cy="260" r="4"/><circle cx="630" cy="290" r="3"/><circle cx="600" cy="315" r="3.5"/>
+                      <circle cx="640" cy="330" r="2.5"/><circle cx="615" cy="355" r="2.5"/><circle cx="650" cy="300" r="2.5"/>
+                      <circle cx="625" cy="380" r="2.5"/><circle cx="595" cy="345" r="2.5"/>
+                      <circle cx="800" cy="160" r="4"/><circle cx="830" cy="185" r="3.5"/><circle cx="870" cy="200" r="3"/>
+                      <circle cx="790" cy="210" r="3"/><circle cx="850" cy="230" r="3.5"/><circle cx="910" cy="215" r="2.5"/>
+                      <circle cx="820" cy="250" r="3"/><circle cx="880" cy="260" r="2.5"/><circle cx="940" cy="240" r="2.5"/>
+                      <circle cx="860" cy="290" r="2.5"/><circle cx="900" cy="310" r="2.5"/><circle cx="780" cy="280" r="2.5"/>
+                      <circle cx="990" cy="420" r="3"/><circle cx="1015" cy="435" r="2.5"/><circle cx="1035" cy="415" r="2.5"/>
+                      <circle cx="1010" cy="455" r="2"/><circle cx="960" cy="440" r="2.5"/>
+                    </g>
+                    <g stroke="#06B6D4" strokeWidth="0.8" strokeDasharray="3 4" opacity="0.4" fill="none">
+                      <path d="M840 235 Q 480 120 240 155" />
+                      <path d="M840 235 Q 600 400 335 300" />
+                      <path d="M840 235 Q 720 180 610 165" />
+                      <path d="M840 235 Q 800 380 990 430" />
+                    </g>
+                    <circle cx="840" cy="235" r="5" fill="#06B6D4"><animate attributeName="opacity" values="1;0.3;1" dur="3s" repeatCount="indefinite"/></circle>
+                  </svg>
+                  <div className="relative z-10 px-5 py-2 rounded-full glass border border-border backdrop-blur-sm">
+                    <p className="text-sm font-medium text-white">🌍 Serving Clients Worldwide</p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

@@ -154,7 +154,7 @@ export default function HomePage() {
             {[
               { title: "Enterprise-Grade Quality", desc: "Production-ready AI solutions built with best-in-class architecture, security, and scalability.", icon: "⚡" },
               { title: "Custom-Built Solutions", desc: "Every solution is designed around your specific business needs — no cookie-cutter templates.", icon: "🎯" },
-              { title: "Rapid Deployment", desc: "From strategy to launch in weeks, not months. Agile development with continuous iteration.", icon: "🚀" },
+              { title: "Rapid Deployment", desc: "Implementation typically takes 7-10 days. Agile development with continuous iteration.", icon: "🚀" },
               { title: "Measurable ROI", desc: "Clear KPIs and metrics tracking from day one. We prove the value of every automation.", icon: "📊" },
               { title: "Ongoing Optimization", desc: "Continuous monitoring, maintenance, and improvement to maximize long-term performance.", icon: "🔄" },
               { title: "Dedicated Support", desc: "Direct access to your development team with priority support and regular strategy reviews.", icon: "🤝" },
@@ -293,7 +293,7 @@ export default function HomePage() {
             columns={2}
             items={[
               { question: "What is AI automation?", answer: "AI automation uses artificial intelligence to perform repetitive tasks, make decisions, and streamline business processes — reducing manual work and improving efficiency." },
-              { question: "How long does implementation take?", answer: "Most projects are delivered within 4–8 weeks depending on complexity. Simple chatbots can be deployed in as little as 2 weeks." },
+              { question: "How long does implementation take?", answer: "Most projects are delivered within 7-10 days depending on complexity. Simple chatbots can be deployed in as little as 7-10 days." },
               { question: "What industries do you serve?", answer: "We work with healthcare, finance, real estate, hospitality, manufacturing, education, marketing agencies, e-commerce, and more." },
               { question: "Do you offer ongoing support?", answer: "Yes. All our solutions include post-launch support, monitoring, and optimization to ensure continuous performance." },
               { question: "What's the ROI of AI automation?", answer: "In illustrative scenarios, businesses can see up to 60% cost savings and 3x faster response times within the first 3 months of deployment. During discovery we model the ROI for your specific volumes and workflows, then track real results against agreed KPIs." },

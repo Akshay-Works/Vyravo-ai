@@ -84,7 +84,7 @@ const faqCategories = [
   {
     category: "Development & Timeline",
     faqs: [
-      { question: "How long does a typical project take?", answer: "Simple chatbots can be deployed in 2-3 weeks. Complex workflow automation or custom AI solutions typically take 4-8 weeks. We provide a detailed timeline during the proposal stage." },
+      { question: "How long does a typical project take?", answer: "Simple chatbots can be deployed in 7-10 days. Complex workflow automation or custom AI solutions typically take 7-10 days. We provide a detailed timeline during the proposal stage." },
       { question: "What is your development process?", answer: "We follow a 4-step process: Discovery Call → Strategy & Proposal → Build & Iterate → Launch & Optimize. You're involved at every stage with weekly demos and feedback sessions." },
       { question: "Will I have access to the source code?", answer: "Yes. You receive full ownership of the source code and intellectual property for your custom solution." },
       { question: "Can I request changes during development?", answer: "Absolutely. We use an agile approach with weekly demos and feedback sessions. Changes within the agreed scope are always welcome." },

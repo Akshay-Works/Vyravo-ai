@@ -379,7 +379,7 @@ function generateFromTemplates(
       type: "prose",
       content: input.requirements?.length
         ? `Target timeline based on requirements: ${input.requirements.join(", ")}`
-        : "A detailed timeline will be confirmed during kickoff. Typical AI automation projects are delivered within 4–8 weeks.",
+        : "A detailed timeline will be confirmed during kickoff. Typical AI automation projects are delivered within 7-10 days.",
     },
     {
       id: "why_vyravo",

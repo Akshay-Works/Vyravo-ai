@@ -218,7 +218,7 @@ export function generateResponse(
         .map(p => `**${p.step}. ${p.name}**\n   ${p.description}`)
         .join("\n\n");
       return {
-        message: `Here's how we work:\n\n${processSteps}\n\nMost projects are delivered within 4-8 weeks. Simple chatbots can be ready in 2-3 weeks.\n\nWould you like to start with a free discovery call?`,
+        message: `Here's how we work:\n\n${processSteps}\n\nMost projects are delivered within 7-10 days. Simple chatbots can be ready in 7-10 days.\n\nWould you like to start with a free discovery call?`,
         suggestedActions: generateBookingActions(),
         intent,
       };

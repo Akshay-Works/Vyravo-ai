@@ -90,7 +90,7 @@ export const COMPANY_KNOWLEDGE = {
   },
 
   faqs: [
-    { q: "How long does implementation take?", a: "Most projects are delivered within 4-8 weeks. Simple chatbots can be deployed in 2-3 weeks." },
+    { q: "How long does implementation take?", a: "Most projects are delivered within 7-10 days. Simple chatbots can be deployed in 7-10 days." },
     { q: "Do you offer ongoing support?", a: "Yes! All projects include 30 days of post-launch support. We also offer ongoing maintenance packages." },
     { q: "Can you integrate with our existing tools?", a: "Absolutely. We integrate with popular CRMs, ERPs, communication platforms, and custom APIs." },
     { q: "Is my data secure?", a: "Yes. We follow enterprise-grade security practices including encryption, access controls, and GDPR compliance." },

@@ -16,12 +16,12 @@ export default function PrivacyPolicyPage() {
         <h1 className="text-3xl md:text-4xl font-semibold tracking-tight font-[var(--font-heading)]">
           Privacy Policy
         </h1>
-        <p className="mt-4 text-sm text-grey">Last updated: January 2025</p>
+        <p className="mt-4 text-sm text-grey">Last Updated: August 2026</p>
 
         <div className="mt-10 space-y-8 text-grey leading-relaxed text-sm">
           <section>
             <h2 className="text-xl font-semibold text-white font-[var(--font-heading)] mb-3">1. Introduction</h2>
-            <p>Vyravo AI (&quot;we,&quot; &quot;our,&quot; or &quot;us&quot;) is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you visit our website or use our services.</p>
+            <p>Vyravo AI is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you visit our website or use our services.</p>
           </section>
 
           <section>

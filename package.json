@@ -11,7 +11,8 @@
     "kb:reembed": "tsx scripts/kb-reembed.ts",
     "proposal:setup": "tsx scripts/proposal-setup.ts",
     "portal:setup": "tsx scripts/portal-setup.ts",
-    "workflow:setup": "tsx scripts/workflow-setup.ts"
+    "workflow:setup": "tsx scripts/workflow-setup.ts",
+    "email:process": "tsx scripts/email-process.ts"
   },
   "dependencies": {
     "@react-pdf/renderer": "^4.6.1",
@@ -25,6 +26,7 @@
     "jsonwebtoken": "^9.0.3",
     "mammoth": "^1.12.1",
     "next": "16.2.6",
+    "nodemailer": "^9.0.5",
     "openai": "^6.49.0",
     "pdf-parse": "^2.4.5",
     "pg": "8.20.0",
@@ -38,6 +40,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "4.1.17",
     "@types/node": "22.19.15",
+    "@types/nodemailer": "^8.0.1",
     "@types/pg": "8.18.0",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
