@@ -26,6 +26,8 @@ export default function PortalLoginPage() {
     } catch { setError("Login failed. Please try again."); setLoading(false); }
   };
 
+  const ic = "w-full px-4 py-3 rounded-xl bg-surface border border-border text-white placeholder:text-grey-dark focus:outline-none focus:border-primary/50";
+
   return (
     <main className="min-h-screen flex items-center justify-center relative overflow-hidden">
       <div className="absolute inset-0 mesh-gradient" />
@@ -41,20 +43,19 @@ export default function PortalLoginPage() {
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-grey mb-2">Email</label>
               <input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@company.com"
-                className="w-full px-4 py-3 rounded-xl bg-surface border border-border text-white placeholder:text-grey-dark focus:outline-none focus:border-primary/50" />
+                placeholder="you@company.com" className={ic} />
             </div>
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-grey mb-2">Password</label>
               <input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter your password"
-                className="w-full px-4 py-3 rounded-xl bg-surface border border-border text-white placeholder:text-grey-dark focus:outline-none focus:border-primary/50" />
+                placeholder="Enter your password" className={ic} />
             </div>
             {error && <div className="px-4 py-3 rounded-xl border border-red-500/30 bg-red-500/10 text-sm text-red-400">{error}</div>}
             <button type="submit" disabled={loading} className="btn-primary w-full justify-center disabled:opacity-60 cursor-not-allowed">
               {loading ? "Signing in..." : "Sign In"}
             </button>
           </form>
+          <p className="mt-4 text-center"><Link href="/portal/register" className="text-sm text-primary hover:underline">Create an account →</Link></p>
           <p className="mt-6 text-center"><Link href="/" className="text-sm text-grey hover:text-white transition-colors">← Back to Vyravo AI</Link></p>
         </div>
       </div>
