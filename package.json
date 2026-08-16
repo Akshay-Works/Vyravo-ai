@@ -8,9 +8,11 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "kb:setup": "tsx scripts/kb-setup.ts",
-    "kb:reembed": "tsx scripts/kb-reembed.ts"
+    "kb:reembed": "tsx scripts/kb-reembed.ts",
+    "proposal:setup": "tsx scripts/proposal-setup.ts"
   },
   "dependencies": {
+    "@react-pdf/renderer": "^4.6.1",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
     "@xenova/transformers": "^2.17.2",
