@@ -32,6 +32,12 @@ export interface LeadInfo {
   timeline?: string;
   interests?: string[];
   qualified?: boolean;
+  /** How the visitor handles this work today (captured conversationally by the AI). */
+  currentWorkflow?: string;
+  /** What the visitor wants to achieve (captured conversationally by the AI). */
+  desiredOutcome?: string;
+  /** AI-assessed buying interest for this conversation. */
+  interestLevel?: "low" | "medium" | "high" | "unknown";
 }
 
 export interface QuickAction {

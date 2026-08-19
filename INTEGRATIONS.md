@@ -1,5 +1,13 @@
 # Integrations — Vyravo AI
 
+## OpenAI (website chatbot)
+
+The public chatbot runs on the **OpenAI Responses API** (official `openai` SDK),
+grounded in the site content + PUBLIC Knowledge Base, with structured-output
+lead qualification that feeds the existing HubSpot and discovery-call flows.
+Set `OPENAI_API_KEY` in Vercel; without it the chatbot falls back to the
+built-in engine. Full details: **[OPENAI.md](./OPENAI.md)**.
+
 ## Voice Receptionist
 
 The AI Voice Receptionist lives at `/voice-receptionist` (dashboard, call history,
@@ -56,7 +64,7 @@ All secrets live **only** in Vercel environment variables (server-side).
 | Source | Endpoint | HubSpot effect |
 |---|---|---|
 | Contact form | `POST /api/contact` | Contact created/updated (deduped by email) + deal at **Prospecting** |
-| AI chatbot | `POST /api/chat` | When a visitor shares a valid email in chat, contact created/updated + deal at **Prospecting** (`leadCaptured` in the response reports the outcome) |
+| AI chatbot | `POST /api/chat` | When a visitor shares a valid email in chat, contact created/updated + deal at **Prospecting** (`leadCaptured` in the response reports the outcome). With `OPENAI_API_KEY` set, the AI also extracts name, company, industry, business size, main problem, current workflow, desired outcome and interest level from the conversation and syncs them to the same contact/deal. |
 
 The discovery-call booking flow (its own app) captures fuller leads — see the `Vyravo-Ai-Discovery-Call` repo.
 
