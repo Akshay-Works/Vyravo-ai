@@ -5,7 +5,20 @@ import { ChatMessage } from "./ChatMessage";
 import { ChatInput } from "./ChatInput";
 import { QuickActions } from "./QuickActions";
 import { TypingIndicator } from "./TypingIndicator";
+import { SITE_LINKS } from "@/lib/constants";
 import type { QuickAction, ConversationContext } from "@/lib/chatbot/types";
+
+/** Client-side ceiling for a chat round trip (the server also has its own). */
+const REQUEST_TIMEOUT_MS = 30_000;
+/** Minimum perceived turn length, so instant answers still feel conversational. */
+const MIN_TURN_MS = 700;
+/** Never add more than this on top of a real response. */
+const MAX_TYPING_PAD_MS = 500;
+
+const DISCOVERY_CALL_URL = SITE_LINKS.discoveryCall;
+const WELCOME_FALLBACK = "Hi! 👋 Welcome to Vyravo AI. How can I help you today?";
+const ERROR_FALLBACK =
+  "Sorry, I'm having trouble processing that right now. Please try again or book a discovery call.";
 
 interface Message {
   id: string;
@@ -22,6 +35,13 @@ export function ChatWidget() {
   const [hasInitialized, setHasInitialized] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  // Guards against duplicate submissions (double-click, Enter spam, quick
+  // actions fired while a request is already in flight).
+  const isSendingRef = useRef(false);
+
+  // Abort in-flight requests if the component unmounts.
+  const abortRef = useRef<AbortController | null>(null);
+  useEffect(() => () => abortRef.current?.abort(), []);
 
   // Auto-scroll to bottom
   const scrollToBottom = useCallback(() => {
@@ -45,15 +65,15 @@ export function ChatWidget() {
     try {
       const res = await fetch("/api/chat");
       const data = await res.json();
-      
+
       // Simulate typing delay for natural feel
       await new Promise(resolve => setTimeout(resolve, 800));
-      
+
       setMessages([
         {
           id: crypto.randomUUID(),
           role: "assistant",
-          content: data.response,
+          content: data.response || WELCOME_FALLBACK,
           suggestedActions: data.suggestedActions,
         },
       ]);
@@ -63,7 +83,7 @@ export function ChatWidget() {
         {
           id: crypto.randomUUID(),
           role: "assistant",
-          content: "Hi! 👋 Welcome to Vyravo AI. How can I help you today?",
+          content: WELCOME_FALLBACK,
         },
       ]);
     } finally {
@@ -72,29 +92,44 @@ export function ChatWidget() {
   };
 
   const sendMessage = async (content: string) => {
+    const trimmed = content.trim();
+    // Ignore empty input and reject overlapping sends.
+    if (!trimmed || isSendingRef.current) return;
+    isSendingRef.current = true;
+
     // Add user message
     const userMessage: Message = {
       id: crypto.randomUUID(),
       role: "user",
-      content,
+      content: trimmed,
     };
     setMessages(prev => [...prev, userMessage]);
     setIsTyping(true);
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    const startedAt = Date.now();
 
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: content, context }),
+        body: JSON.stringify({ message: trimmed, context }),
+        signal: controller.signal,
       });
-      const data = await res.json();
 
-      // Simulate natural typing delay based on response length
-      const typingDelay = Math.min(500 + data.response.length * 5, 2000);
-      await new Promise(resolve => setTimeout(resolve, typingDelay));
+      const data = await res.json().catch(() => null);
+      const replyText: string = data?.response || ERROR_FALLBACK;
 
-      // Update context
-      if (data.context) {
+      // Keep the "typing" beat natural without adding latency to a slow AI
+      // response — only pad when the server answered faster than that beat.
+      const elapsed = Date.now() - startedAt;
+      const padding = Math.max(0, Math.min(MAX_TYPING_PAD_MS, MIN_TURN_MS - elapsed));
+      if (padding > 0) await new Promise(resolve => setTimeout(resolve, padding));
+
+      // Update context (only when the server returned a usable one)
+      if (data?.context) {
         setContext(data.context);
       }
 
@@ -102,21 +137,29 @@ export function ChatWidget() {
       const assistantMessage: Message = {
         id: crypto.randomUUID(),
         role: "assistant",
-        content: data.response,
-        suggestedActions: data.suggestedActions,
+        content: replyText,
+        suggestedActions: data?.suggestedActions,
       };
       setMessages(prev => [...prev, assistantMessage]);
     } catch (error) {
-      console.error("Chat error:", error);
+      // Network failure, timeout, or unmount — show a clean, actionable message.
+      const aborted = error instanceof DOMException && error.name === "AbortError";
+      if (!aborted) console.error("Chat error:", error);
       setMessages(prev => [
         ...prev,
         {
           id: crypto.randomUUID(),
           role: "assistant",
-          content: "I apologize, but I encountered an issue. You can reach us directly at +91 9075707650 or akshay.navale.work@gmail.com.",
+          content: ERROR_FALLBACK,
+          suggestedActions: [
+            { id: "book", label: "📅 Book Discovery Call", action: "link", value: DISCOVERY_CALL_URL },
+          ],
         },
       ]);
     } finally {
+      clearTimeout(timeoutId);
+      abortRef.current = null;
+      isSendingRef.current = false;
       setIsTyping(false);
     }
   };
@@ -165,6 +208,9 @@ export function ChatWidget() {
             ? "opacity-100 translate-y-0 pointer-events-auto"
             : "opacity-0 translate-y-4 pointer-events-none"
         }`}
+        role="dialog"
+        aria-label="Vyravo AI assistant"
+        aria-hidden={!isOpen}
       >
         <div className="glass rounded-2xl overflow-hidden shadow-2xl shadow-black/40 border border-border flex flex-col h-[600px] max-h-[calc(100vh-140px)]">
           {/* Header */}
@@ -198,6 +244,11 @@ export function ChatWidget() {
           <div
             ref={chatContainerRef}
             className="flex-1 overflow-y-auto p-4 space-y-4 scroll-smooth"
+            role="log"
+            aria-live="polite"
+            aria-relevant="additions text"
+            aria-busy={isTyping}
+            aria-label="Conversation"
           >
             {messages.map((message) => (
               <ChatMessage

@@ -10,8 +10,23 @@
 
 import type { ConversationContext, ChatResponse } from "@/lib/chatbot/types";
 import { getProvider } from "@/lib/chatbot/providers";
+import {
+  getChatModel,
+  getOpenAIClient,
+  isOpenAIConfigured,
+  logOpenAIError,
+  modelSupportsTemperature,
+} from "@/lib/openai/client";
 import { searchPublicKnowledge, buildPublicContext, hasPublicKnowledge } from "./public-client";
 import { detectIntent } from "@/lib/chatbot/engine";
+
+const KB_SYSTEM_PROMPT = `You are the Vyravo AI website assistant. Answer the visitor's question using ONLY the provided company knowledge below.
+Rules:
+1. Answer ONLY from the provided knowledge. NEVER invent services, prices, client names, stats, case studies, or policies.
+2. If the knowledge does not answer the question, say you don't have that information and suggest booking a free discovery call or contacting +91 9075707650 / akshay.navale.work@gmail.com.
+3. Do not mention "knowledge base", "sources", or "[1]" citations. Write naturally, concise and friendly.
+4. Keep formatting light (short bullets are fine).`;
+
 
 // Local (Xenova MiniLM) scores sit ~0.3–0.5; OpenAI scores ~0.6–0.9.
 const KB_MIN_SCORE =
@@ -102,6 +117,36 @@ export async function tryKnowledgeBaseAnswer(
   }
 }
 
+/**
+ * Retrieve PUBLIC + APPROVED Knowledge Base context for a visitor message so an
+ * LLM can ground its answer in it. Used by the OpenAI chat path in /api/chat.
+ *
+ * Returns null when the KB is empty, unreachable, slow, or has no strong match.
+ * NEVER throws — the chatbot must keep working without the KB.
+ */
+export async function getPublicKnowledgeContext(
+  message: string
+): Promise<{ context: string; sources: { documentId: number; documentTitle: string }[] } | null> {
+  try {
+    const kb = await withKbTimeout(hasPublicKnowledge());
+    if (!kb) return null;
+
+    const hits = await withKbTimeout(
+      searchPublicKnowledge({ query: message, topK: 4, threshold: KB_MIN_SCORE })
+    );
+
+    if (hits.length === 0 || hits[0].score < KB_MIN_SCORE) return null;
+
+    return {
+      context: buildPublicContext(hits),
+      sources: hits.map((h) => ({ documentId: h.documentId, documentTitle: h.documentTitle })),
+    };
+  } catch (e) {
+    console.error("KB context retrieval failed (continuing without it):", e);
+    return null;
+  }
+}
+
 /** Ask the configured LLM provider to answer strictly from KB context. */
 async function answerWithProvider(
   message: string,
@@ -110,37 +155,26 @@ async function answerWithProvider(
 ): Promise<string | null> {
   const context = buildPublicContext(hits as any);
 
-  const systemPrompt = `You are the Vyravo AI website assistant. Answer the visitor's question using ONLY the provided company knowledge below.
-Rules:
-1. Answer ONLY from the provided knowledge. NEVER invent services, prices, client names, stats, case studies, or policies.
-2. If the knowledge does not answer the question, say you don't have that information and suggest booking a free discovery call or contacting +91 9075707650 / akshay.navale.work@gmail.com.
-3. Do not mention "knowledge base", "sources", or "[1]" citations. Write naturally, concise and friendly.
-4. Keep formatting light (short bullets are fine).`;
+  const systemPrompt = KB_SYSTEM_PROMPT;
 
   const userPrompt = `Company Knowledge:\n\n${context}\n\n---\n\nVisitor question: ${message}`;
 
   try {
     switch (provider) {
       case "openai": {
-        const key = process.env.OPENAI_API_KEY;
-        if (!key) return null;
-        const res = await fetch("https://api.openai.com/v1/chat/completions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-          body: JSON.stringify({
-            model: process.env.CHATBOT_LLM_MODEL || "gpt-4o-mini",
-            messages: [
-              { role: "system", content: systemPrompt },
-              { role: "user", content: userPrompt },
-            ],
-            temperature: 0.3,
-            max_tokens: 500,
-          }),
+        if (!isOpenAIConfigured()) return null;
+        const client = getOpenAIClient();
+        const model = getChatModel();
+        const res = await client.responses.create({
+          model,
+          instructions: systemPrompt,
+          input: [{ role: "user", content: userPrompt }],
+          max_output_tokens: 500,
+          ...(modelSupportsTemperature(model) ? { temperature: 0.3 } : {}),
         });
-        if (!res.ok) return null;
-        const data = await res.json();
-        return data.choices?.[0]?.message?.content?.trim() || null;
+        return res.output_text?.trim() || null;
       }
+
       case "anthropic": {
         const key = process.env.ANTHROPIC_API_KEY;
         if (!key) return null;
@@ -185,7 +219,7 @@ Rules:
         return null;
     }
   } catch (e) {
-    console.error("KB LLM answer failed:", e);
+    logOpenAIError("kb.answer", e);
     return null;
   }
 }
