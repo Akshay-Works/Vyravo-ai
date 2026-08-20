@@ -1,9 +1,16 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { SectionHeading } from "@/components/SectionHeading";
 import { ServiceIcon } from "@/components/ServiceIcon";
 import { CTA } from "@/components/CTA";
 import { Accordion } from "@/components/Accordion";
 import { SERVICES, INDUSTRIES, PROCESS_STEPS, STATS, SITE_LINKS } from "@/lib/constants";
+
+export const metadata: Metadata = {
+  alternates: {
+    canonical: "https://vyravo-ai.vercel.app/",
+  },
+};
 
 export default function HomePage() {
   return (
