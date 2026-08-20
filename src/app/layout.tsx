@@ -8,6 +8,7 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Analytics } from "@vercel/analytics/next";
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://vyravo-ai.vercel.app"),
   title: {
     default: "Vyravo AI — Intelligent Automation for Modern Businesses",
     template: "%s | Vyravo AI",
@@ -28,15 +29,25 @@ export const metadata: Metadata = {
     type: "website",
     locale: "en_US",
     siteName: "Vyravo AI",
-    title: "Vyravo AI — Intelligent Automation for Modern Businesses",
+    title: "Vyravo AI | Intelligent Automation for Modern Businesses",
     description:
-      "We build AI chatbots, voice agents, and intelligent automation systems that eliminate repetitive work and accelerate business growth.",
+      "Vyravo AI helps businesses automate sales, customer support, and operations with AI-powered solutions.",
+    url: "https://vyravo-ai.vercel.app/",
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "Vyravo AI | Intelligent Automation for Modern Businesses",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Vyravo AI — Intelligent Automation for Modern Businesses",
+    title: "Vyravo AI | Intelligent Automation for Modern Businesses",
     description:
-      "We build AI chatbots, voice agents, and intelligent automation systems that eliminate repetitive work and accelerate business growth.",
+      "Vyravo AI helps businesses automate sales, customer support, and operations with AI-powered solutions.",
+    images: ["/og-image.png"],
   },
   robots: { index: true, follow: true },
 };
