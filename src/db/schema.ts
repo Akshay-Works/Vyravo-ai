@@ -509,6 +509,41 @@ export const contactSubmissions = pgTable("contact_submissions", {
   read: boolean("read").default(false).notNull(),
 });
 
+// ==================== WHATSAPP AI CHATBOT ====================
+// These tables are also created idempotently by lib/whatsapp/storage.ts so a
+// deployment can start receiving messages before a Drizzle migration is run.
+export const whatsappConversations = pgTable("whatsapp_conversations", {
+  id: serial("id").primaryKey(),
+  conversationId: varchar("conversation_id", { length: 128 }).notNull().unique(),
+  phoneNumber: varchar("phone_number", { length: 32 }).notNull().unique(),
+  contactName: text("contact_name"),
+  status: varchar("status", { length: 20 }).notNull().default("AI_ACTIVE"),
+  qualificationState: varchar("qualification_state", { length: 40 }).notNull().default("new"),
+  leadInfo: jsonb("lead_info"),
+  handoffReason: text("handoff_reason"),
+  handoffNotificationStatus: varchar("handoff_notification_status", { length: 20 }).notNull().default("not_attempted"),
+  crmSyncStatus: varchar("crm_sync_status", { length: 30 }).notNull().default("not_attempted"),
+  crmSyncFingerprint: varchar("crm_sync_fingerprint", { length: 128 }),
+  lastMessageAt: timestamp("last_message_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const whatsappMessages = pgTable("whatsapp_messages", {
+  id: serial("id").primaryKey(),
+  conversationId: integer("conversation_id").notNull(),
+  providerMessageId: varchar("provider_message_id", { length: 160 }).notNull().unique(),
+  direction: varchar("direction", { length: 10 }).notNull(),
+  messageType: varchar("message_type", { length: 40 }).notNull(),
+  body: text("body"),
+  deliveryStatus: varchar("delivery_status", { length: 30 }).notNull().default("received"),
+  processingStatus: varchar("processing_status", { length: 20 }).notNull().default("completed"),
+  processingStartedAt: timestamp("processing_started_at"),
+  providerTimestamp: timestamp("provider_timestamp"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 // ==================== VOICE RECEPTIONIST ====================
 // Table names are scoped (receptionist_*) to avoid colliding with other
 // voice-related tables that may exist in the shared database.

@@ -38,6 +38,10 @@ export interface LeadInfo {
   desiredOutcome?: string;
   /** AI-assessed buying interest for this conversation. */
   interestLevel?: "low" | "medium" | "high" | "unknown";
+  /** Preferred way for the team to continue the conversation. */
+  preferredContactMethod?: "whatsapp" | "phone" | "email";
+  /** True after the visitor clearly asks to schedule a discovery call. */
+  discoveryCallRequested?: boolean;
 }
 
 export interface QuickAction {

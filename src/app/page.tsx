@@ -4,6 +4,7 @@ import { SectionHeading } from "@/components/SectionHeading";
 import { ServiceIcon } from "@/components/ServiceIcon";
 import { CTA } from "@/components/CTA";
 import { Accordion } from "@/components/Accordion";
+import { WhatsAppCTA } from "@/components/WhatsAppCTA";
 import { SERVICES, INDUSTRIES, PROCESS_STEPS, STATS, SITE_LINKS } from "@/lib/constants";
 
 export const metadata: Metadata = {
@@ -49,6 +50,10 @@ export default function HomePage() {
               Explore Solutions
             </Link>
           </div>
+          <div className="mt-5 flex justify-center">
+            <WhatsAppCTA />
+          </div>
+          <p className="mt-3 text-xs text-grey-dark">Prefer messaging? Start a conversation with Vyravo AI on WhatsApp.</p>
 
           {/* Trust stats */}
           <div className="mt-20 grid grid-cols-2 md:grid-cols-4 gap-8 max-w-3xl mx-auto">

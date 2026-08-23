@@ -16,6 +16,7 @@ const WINDOW_MS = 60_000;
 const LIMITS: Record<string, { limit: number }> = {
   ask: { limit: 20 },      // 20 AI questions / min / IP
   chat: { limit: 20 },     // 20 website-chatbot messages / min / IP (OpenAI-backed)
+  whatsapp: { limit: 30 }, // 30 inbound WhatsApp messages / min / sender
   search: { limit: 60 },   // 60 searches / min / IP
   upload: { limit: 10 },   // 10 uploads / min / IP
   write: { limit: 30 },    // 30 writes (create/update/delete) / min / IP

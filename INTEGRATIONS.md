@@ -1,5 +1,11 @@
 # Integrations — Vyravo AI
 
+## WhatsApp AI Chatbot
+
+The production WhatsApp path uses the official Meta WhatsApp Cloud API — not an unofficial automation library. It is implemented at `/api/whatsapp/webhook`, persists conversations in PostgreSQL, reuses the existing chatbot/OpenAI/Knowledge Base and HubSpot helpers, and supports `AI_ACTIVE` / `HUMAN_HANDOFF` states. Setup, Meta configuration, environment variables, local tunnel testing, and Vercel deployment steps are in **[WHATSAPP.md](./WHATSAPP.md)**.
+
+The website entry point is the `wa.me` click-to-chat CTA labelled “Chat with Vyravo AI on WhatsApp”. It opens WhatsApp with a pre-filled message; the AI conversation begins only after the visitor sends it to the configured business number.
+
 ## OpenAI (website chatbot)
 
 The public chatbot runs on the **OpenAI Responses API** (official `openai` SDK),
@@ -20,7 +26,7 @@ Email Automation app — currently in **Demo Mode** (simulated line).
 | Variable | Required | Purpose |
 |---|---|---|
 | `ADMIN_API_KEY` | Optional | When set, all `/api/voice/*` endpoints require the `x-admin-key` header (call history, config, stats are then protected). When unset, endpoints run in open demo mode. |
-| `EMAIL_AUTOMATION_WEBHOOK_URL` | Optional | Webhook in the Email Automation app that receives voice follow-up triggers (`new_qualified_lead`, `callback_request`, `appointment_booked`, `human_escalation`). Without it, triggers are recorded honestly as "queued (simulated)". |
+| `EMAIL_AUTOMATION_WEBHOOK_URL` | Optional | Webhook in the Email Automation app that receives voice and WhatsApp follow-up triggers (`new_qualified_lead`, `callback_request`, `appointment_booked`, `human_escalation`). Without it, triggers are recorded honestly as "queued (simulated)". |
 | `VOICE_PROVIDER` | Optional | `demo` (default) or `live`. The live adapter is reserved — Demo Mode never pretends real calls are connected. |
 | `VOICE_STORE` | Optional | `memory` forces the in-memory store (local testing). Default: project database. |
 
@@ -64,7 +70,7 @@ All secrets live **only** in Vercel environment variables (server-side).
 | Source | Endpoint | HubSpot effect |
 |---|---|---|
 | Contact form | `POST /api/contact` | Contact created/updated (deduped by email) + deal at **Prospecting** |
-| AI chatbot | `POST /api/chat` | When a visitor shares a valid email in chat, contact created/updated + deal at **Prospecting** (`leadCaptured` in the response reports the outcome). With `OPENAI_API_KEY` set, the AI also extracts name, company, industry, business size, main problem, current workflow, desired outcome and interest level from the conversation and syncs them to the same contact/deal. |
+| AI chatbot | `POST /api/chat` and `POST /api/whatsapp/webhook` | Website chat syncs after a valid email; WhatsApp syncs qualified leads by email or phone. Both create/update a contact + deal at **Prospecting**. With `OPENAI_API_KEY` set, the AI extracts name, company, industry, business size, main problem, current workflow, desired outcome and interest level. |
 
 The discovery-call booking flow (its own app) captures fuller leads — see the `Vyravo-Ai-Discovery-Call` repo.
 

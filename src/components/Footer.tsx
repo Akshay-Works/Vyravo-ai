@@ -16,6 +16,7 @@ const footerLinks: Record<string, { label: string; href: string; external?: bool
     { label: "Contact", href: "/contact" },
     { label: "Voice Receptionist", href: SITE_LINKS.voiceReceptionist },
     { label: "Book Discovery Call", href: SITE_LINKS.discoveryCall, external: true },
+    { label: "Chat on WhatsApp", href: SITE_LINKS.whatsapp, external: true },
     { label: "Email Automation", href: SITE_LINKS.emailAutomation, external: true },
     { label: "CRM", href: SITE_LINKS.crm, external: true },
   ],

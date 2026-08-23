@@ -33,11 +33,11 @@ the key in `NEXT_PUBLIC_*`, in code, or in a committed file.
 ## Architecture
 
 ```
-Visitor → ChatWidget (client)
-        → POST /api/chat            ← validation + per-IP rate limit
+Visitor → ChatWidget (client) or WhatsApp webhook
+        → POST /api/chat or /api/whatsapp/webhook ← validation + rate limit
         → PUBLIC Knowledge Base     ← optional grounding context
         → OpenAI Responses API      ← structured output (reply + lead fields)
-        → lead merge                → EXISTING HubSpot sync (deduped by email)
+        → lead merge                → EXISTING HubSpot sync (deduped by email/phone)
                                     → EXISTING discovery-call booking link
 ```
 

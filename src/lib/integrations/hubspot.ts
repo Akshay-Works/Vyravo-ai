@@ -5,7 +5,8 @@ const HUBSPOT_API = "https://api.hubapi.com";
 
 export interface LeadSyncData {
   fullName?: string | null;
-  email: string;
+  /** Email is preferred, but WhatsApp leads may initially only have a phone. */
+  email?: string | null;
   phone?: string | null;
   businessName?: string | null;
   businessWebsite?: string | null;
@@ -20,6 +21,7 @@ export interface LeadSyncData {
   leadCategory?: string | null;
   source?: string | null;
   qualificationSummary?: string | null;
+  preferredContactMethod?: string | null;
 }
 
 export interface HubSpotSyncResult {
@@ -49,6 +51,7 @@ async function hsRequest(path: string, method: string, body?: unknown): Promise<
       "Content-Type": "application/json",
     },
     body: body === undefined ? undefined : JSON.stringify(body),
+    signal: AbortSignal.timeout(10_000),
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
@@ -72,6 +75,8 @@ const CUSTOM_PROPERTIES: { name: string; label: string; type: string; fieldType:
   { name: "vyravo_challenges", label: "Vyravo Biggest Challenge", type: "string", fieldType: "textarea" },
   { name: "vyravo_goals", label: "Vyravo Automation Goals", type: "string", fieldType: "textarea" },
   { name: "vyravo_source", label: "Vyravo Lead Source", type: "string", fieldType: "text" },
+  { name: "vyravo_qualification_summary", label: "Vyravo Qualification Summary", type: "string", fieldType: "textarea" },
+  { name: "vyravo_preferred_contact_method", label: "Vyravo Preferred Contact Method", type: "string", fieldType: "text" },
 ];
 
 let customPropsState: "unknown" | "available" | "unavailable" = "unknown";
@@ -121,12 +126,33 @@ export async function findContactByEmail(email: string): Promise<{ id: string; p
   return contact ? { id: contact.id, properties: contact.properties || {} } : null;
 }
 
+function sanitizePhone(phone: unknown): string | null {
+  if (typeof phone !== "string") return null;
+  const cleaned = phone.trim().slice(0, 50);
+  const digits = cleaned.replace(/\D/g, "");
+  return digits.length >= 7 && digits.length <= 15 ? cleaned : null;
+}
+
+/** Find a contact by phone when a WhatsApp lead has not shared an email yet. */
+export async function findContactByPhone(phone: string): Promise<{ id: string; properties: Record<string, string> } | null> {
+  const candidates = [...new Set([phone, phone.replace(/\s+/g, ""), phone.replace(/^\+/, "")])];
+  for (const candidate of candidates) {
+    const result = await hsRequest("/crm/v3/objects/contacts/search", "POST", {
+      filterGroups: [{ filters: [{ propertyName: "phone", value: candidate, operator: "EQ" }] }],
+      limit: 1,
+    });
+    const contact = result?.results?.[0];
+    if (contact) return { id: contact.id, properties: contact.properties || {} };
+  }
+  return null;
+}
+
 function buildContactProperties(lead: LeadSyncData, includeCustom: boolean): Record<string, string> {
   const { firstName, lastName } = splitName(lead.fullName);
   const props: Record<string, string> = {};
   if (firstName) props.firstname = firstName;
   if (lastName) props.lastname = lastName;
-  props.email = lead.email;
+  if (lead.email) props.email = lead.email;
   if (lead.phone) props.phone = lead.phone;
   if (lead.businessName) props.company = lead.businessName;
   if (lead.businessWebsite) props.website = lead.businessWebsite;
@@ -142,6 +168,8 @@ function buildContactProperties(lead: LeadSyncData, includeCustom: boolean): Rec
     if (lead.biggestChallenge) props.vyravo_challenges = lead.biggestChallenge;
     if (lead.automationGoals) props.vyravo_goals = lead.automationGoals;
     if (lead.source) props.vyravo_source = lead.source;
+    if (lead.qualificationSummary) props.vyravo_qualification_summary = lead.qualificationSummary;
+    if (lead.preferredContactMethod) props.vyravo_preferred_contact_method = lead.preferredContactMethod;
   }
   return props;
 }
@@ -198,8 +226,8 @@ async function findDealForContact(contactId: string): Promise<string | null> {
 // ---------------------------------------------------------------------------
 
 /**
- * Create-or-update a HubSpot contact (deduped by email) and ensure an
- * associated deal exists at the given stage label.
+ * Create-or-update a HubSpot contact (deduped by email, then phone) and
+ * ensure an associated deal exists at the given stage label.
  */
 export async function syncLeadToHubSpot(
   lead: LeadSyncData,
@@ -209,14 +237,25 @@ export async function syncLeadToHubSpot(
     return { configured: false, ok: false, error: "HUBSPOT_ACCESS_TOKEN not configured" };
   }
   const email = sanitizeEmail(lead.email);
-  if (!email) return { configured: true, ok: false, error: "Invalid email address" };
+  const phone = sanitizePhone(lead.phone);
+  if (!email && !phone) {
+    return {
+      configured: true,
+      ok: false,
+      error: "A valid email address or phone number is required",
+    };
+  }
 
   try {
     const includeCustom = await ensureCustomProperties();
-    const props = buildContactProperties({ ...lead, email }, includeCustom);
+    const props = buildContactProperties({ ...lead, email, phone }, includeCustom);
 
-    // Deduplicate: search by email before creating.
-    const existing = await findContactByEmail(email);
+    // Deduplicate by email when available; WhatsApp conversations can be
+    // synced before the visitor shares an email, so fall back to phone.
+    let existing = email ? await findContactByEmail(email) : null;
+    // A lead may have first been created from WhatsApp with only a phone and
+    // later share an email. Check phone as a second key to avoid a duplicate.
+    if (!existing && phone) existing = await findContactByPhone(phone);
     let contactId: string;
     let action: "created" | "updated";
 
@@ -241,6 +280,7 @@ export async function syncLeadToHubSpot(
       if (existingDealId) {
         const patch: Record<string, string> = {};
         if (stageId) patch.dealstage = stageId;
+        if (lead.qualificationSummary) patch.description = lead.qualificationSummary;
         if (Object.keys(patch).length > 0) {
           await hsRequest(`/crm/v3/objects/deals/${existingDealId}`, "PATCH", { properties: patch });
         }

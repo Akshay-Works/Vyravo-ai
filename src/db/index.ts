@@ -1,8 +1,13 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 
+// Keep the connection string server-side and configurable. The local fallback
+// is intentionally non-secret and lets the existing local setup work when a
+// developer has PostgreSQL running on the default database.
 const databaseUrl =
-  "postgresql://neondb_owner:npg_l4QY9wqXTOfH@ep-withered-fire-ayv217yl.c-5.us-east-2.aws.neon.tech/neondb?sslmode=require";
+  process.env.DATABASE_URL ||
+  process.env.POSTGRES_URL ||
+  "postgresql://postgres:postgres@127.0.0.1:5432/app_db";
 
 const globalForDb = globalThis as typeof globalThis & {
   __arenaNextJsPostgresqlPool?: Pool;

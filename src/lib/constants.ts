@@ -1,3 +1,13 @@
+// Public WhatsApp business number used only for the click-to-chat link. It is
+// not a credential; the Cloud API phone-number ID and token stay server-side.
+const configuredWhatsAppNumber = (process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "").replace(/\D/g, "");
+const whatsappNumber = configuredWhatsAppNumber.length >= 7 && configuredWhatsAppNumber.length <= 15
+  ? configuredWhatsAppNumber
+  : "919075707650";
+const whatsappMessage = encodeURIComponent(
+  "Hi Vyravo AI, I'd like to learn how AI automation could help my business."
+);
+
 export const COMPANY = {
   name: "Vyravo AI",
   tagline: "Intelligent Automation for Modern Businesses.",
@@ -16,6 +26,7 @@ export const SITE_LINKS = {
   discoveryCall: "https://vyravo-ai-discovery-call.vercel.app",
   crm: "https://vyravo-ai-crm.vercel.app",
   voiceReceptionist: "/voice-receptionist",
+  whatsapp: `https://wa.me/${whatsappNumber}?text=${whatsappMessage}`,
 };
 
 export const NAV_LINKS: { label: string; href: string; external?: boolean }[] = [

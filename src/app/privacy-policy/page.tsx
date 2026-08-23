@@ -31,7 +31,8 @@ export default function PrivacyPolicyPage() {
               <li>Name, email address, and phone number when you fill out contact forms</li>
               <li>Company name and size when booking discovery calls</li>
               <li>Project details and service preferences</li>
-              <li>Communication records when you contact us</li>
+              <li>Communication records when you contact us, including WhatsApp messages sent to our business number</li>
+              <li>WhatsApp phone number and profile name made available by WhatsApp when you start a conversation</li>
             </ul>
             <p className="mt-3">We also automatically collect certain information when you visit our website, including IP address, browser type, pages visited, and referring URL.</p>
           </section>
@@ -49,8 +50,9 @@ export default function PrivacyPolicyPage() {
           <section>
             <h2 className="text-xl font-semibold text-white font-[var(--font-heading)] mb-3">5. How We Use Your Data</h2>
             <ul className="list-disc list-inside space-y-1">
-              <li>To respond to your inquiries and provide customer support</li>
+              <li>To respond to your inquiries and provide customer support, including through WhatsApp</li>
               <li>To schedule and conduct discovery calls</li>
+              <li>To qualify inquiries and, where configured, update our CRM and human handoff workflow</li>
               <li>To send project proposals and quotes</li>
               <li>To improve our website and services</li>
               <li>To send relevant business communications (with your consent)</li>
@@ -88,7 +90,7 @@ export default function PrivacyPolicyPage() {
 
           <section>
             <h2 className="text-xl font-semibold text-white font-[var(--font-heading)] mb-3">10. Third Parties</h2>
-            <p>We do not sell your personal information to third parties. We may share your data with trusted service providers who assist us in operating our business (hosting, analytics, email services), subject to strict confidentiality agreements.</p>
+            <p>We do not sell your personal information to third parties. We may share your data with trusted service providers who assist us in operating our business (hosting, analytics, Meta WhatsApp Business Platform, AI processing, CRM, and email services), subject to appropriate confidentiality and security obligations.</p>
           </section>
 
           <section>

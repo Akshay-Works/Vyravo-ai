@@ -3,6 +3,7 @@ import { COMPANY } from "@/lib/constants";
 import { ContactForm } from "@/components/ContactForm";
 import { CTA } from "@/components/CTA";
 import { Accordion } from "@/components/Accordion";
+import { WhatsAppCTA } from "@/components/WhatsAppCTA";
 
 export const metadata: Metadata = {
   title: "Contact Us",
@@ -45,6 +46,11 @@ export default function ContactPage() {
             <div className="lg:col-span-2 space-y-6">
               <div className="rounded-2xl border border-border bg-surface p-8">
                 <h3 className="text-lg font-semibold font-[var(--font-heading)] mb-6">Contact Information</h3>
+                <div className="mb-6 rounded-xl border border-[#25D366]/20 bg-[#25D366]/5 p-4">
+                  <p className="text-sm font-medium text-white">Prefer WhatsApp?</p>
+                  <p className="mt-1 mb-3 text-xs leading-relaxed text-grey">Ask about AI automation, qualify your project, or request a human follow-up.</p>
+                  <WhatsAppCTA compact />
+                </div>
                 <div className="space-y-5">
                   <a href={COMPANY.phoneLink} className="flex items-start gap-4 group">
                     <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0">

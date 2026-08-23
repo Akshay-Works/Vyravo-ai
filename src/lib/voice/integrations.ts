@@ -108,7 +108,8 @@ export function isEmailAutomationConfigured(): boolean {
  */
 export async function triggerEmailAutomation(
   type: EmailTriggerType,
-  payload: Record<string, unknown>
+  payload: Record<string, unknown>,
+  options: { source?: string } = {}
 ): Promise<EmailTriggerResult> {
   const url = process.env.EMAIL_AUTOMATION_WEBHOOK_URL?.trim();
   if (!url) {
@@ -118,7 +119,8 @@ export async function triggerEmailAutomation(
     const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type, payload, source: "voice-receptionist" }),
+      body: JSON.stringify({ type, payload, source: options.source || "voice-receptionist" }),
+      signal: AbortSignal.timeout(10_000),
     });
     if (!res.ok) {
       return { configured: true, ok: false, simulated: false, error: `Webhook responded ${res.status}` };
