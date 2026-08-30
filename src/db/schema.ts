@@ -6,7 +6,7 @@ export const leads = pgTable("leads", {
   
   // Basic Info
   fullName: text("full_name").notNull(),
-  email: text("email").notNull(),
+  email: text("email"),                                     // nullable: engine-pushed B2B leads often have no public email
   phone: text("phone"),
   
   // Business Info
