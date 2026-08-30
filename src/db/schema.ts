@@ -581,6 +581,19 @@ export const voiceConfig = pgTable("receptionist_config", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
+
+// ==================== EMAIL TEMPLATES (admin) ====================
+export const emailTemplates = pgTable("email_templates", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 120 }).notNull(),
+  emailType: varchar("email_type", { length: 50 }).notNull().default("campaign"),
+  subject: text("subject").notNull(),
+  body: text("body").notNull(), // HTML — supports {{variables}}
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // ==================== TYPE EXPORTS ====================
 export interface MeetingBrief {
   clientSummary: string;

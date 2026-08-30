@@ -6,10 +6,12 @@ import { Logo } from "@/components/Logo";
 
 const NAV_ITEMS = [
   { href: "/admin/analytics", label: "Analytics", icon: "📊" },
+  { href: "/admin/visitors", label: "Visitors", icon: "👀" },
   { href: "/admin/crm/clients", label: "CRM", icon: "👥" },
   { href: "/admin/crm/leads", label: "CRM Leads", icon: "📇" },
   { href: "/admin/leads", label: "Daily Leads", icon: "🎯" },
   { href: "/admin/email-automation", label: "Email Automation", icon: "✉️" },
+  { href: "/admin/email-templates", label: "Email Templates", icon: "📨" },
   { href: "/admin/workflows", label: "Workflows", icon: "⚡" },
   { href: "/admin/portal/clients", label: "Portal Clients", icon: "👥" },
   { href: "/admin/proposals", label: "Proposals", icon: "📄" },

@@ -18,11 +18,16 @@ export default async function EmailAutomationPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-[var(--font-heading)] text-2xl font-semibold text-white">Email Automation</h1>
-        <p className="mt-1 text-sm text-grey">
-          Real outbound engine: queued emails, processed by the daily email worker, delivered via Resend.
-        </p>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 className="font-[var(--font-heading)] text-2xl font-semibold text-white">Email Automation</h1>
+          <p className="mt-1 text-sm text-grey">
+            Real outbound engine: queued emails, processed by the email worker, delivered via Resend.
+          </p>
+        </div>
+        <a href="/admin/email-templates" className="rounded-lg border border-primary/40 px-4 py-2 text-sm text-primary hover:bg-primary/10">
+          Manage templates →
+        </a>
       </div>
 
       <section>

@@ -69,6 +69,7 @@ export default function AnalyticsDashboardPage() {
           <p className="mt-1 text-sm text-grey">Real-time business intelligence from all Vyravo AI systems</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <a href="/admin/visitors" className="text-xs px-3 py-1.5 rounded-lg border border-primary/40 text-primary hover:bg-primary/10">👀 Visitor traffic</a>
           {PERIODS.map((p) => (
             <button key={p.v} onClick={() => setPeriod(p.v)}
               className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${period === p.v ? "bg-primary/10 border-primary/30 text-primary" : "border-border text-grey hover:text-white"}`}>
