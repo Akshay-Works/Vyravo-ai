@@ -18,6 +18,9 @@ export const TEMPLATE_VARS: { key: string; label: string; sample: string }[] = [
   { key: "category", label: "Category", sample: "HIGH PRIORITY" },
   { key: "challenge", label: "Biggest challenge", sample: "leads come in but 70% never get a follow-up call" },
   { key: "summary", label: "AI summary", sample: "Scored 78/100 — strong fit for AI lead automation." },
+  { key: "meetingDate", label: "Meeting date & time", sample: "2 Sep 2026, 11:00 AM" },
+  { key: "meetingTime", label: "Meeting time", sample: "11:00 AM IST" },
+  { key: "meetingLink", label: "Meeting link", sample: "meet.google.com/abc-defg-hij" },
   { key: "date", label: "Today's date", sample: "31 Aug 2026" },
   { key: "year", label: "Year", sample: "2026" },
 ];
@@ -43,6 +46,23 @@ export function renderTemplate(text: string, data: Record<string, unknown>, { ht
   });
 }
 
+const INDUSTRY_LABELS: Record<string, string> = {
+  estate_agent: "real estate",
+  real_estate: "real estate",
+  realtor: "real estate",
+  broker: "real estate",
+  property_management: "property management",
+  travel_agency: "travel & tourism",
+  employment_agency: "recruitment",
+};
+
+function prettifyIndustry(v?: string | null): string {
+  if (!v) return "";
+  const s = v.trim().toLowerCase();
+  if (INDUSTRY_LABELS[s]) return INDUSTRY_LABELS[s];
+  return s.replace(/_/g, " ");
+}
+
 const fmtDate = (d: Date) =>
   d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 
@@ -59,15 +79,36 @@ export function leadToTemplateData(lead: Record<string, any>): Record<string, st
     email: lead.email || "",
     city: lead.city || "",
     country: lead.country || "",
-    industry: lead.industry || "",
+    industry: prettifyIndustry(lead.industry),
     score: lead.leadScore != null ? String(lead.leadScore) : "",
     category: (lead.leadCategory || "").toUpperCase(),
     challenge: lead.biggestChallenge || lead.qualificationSummary || "",
     summary: lead.qualificationSummary || lead.additionalInfo || "",
     date: fmtDate(new Date()),
     year: String(new Date().getFullYear()),
+    meetingDate: fmtMeeting(lead.meeting_date),
+    meetingTime: fmtMeetingTime(lead.meeting_date, lead.meeting_timezone),
+    meetingLink: lead.meeting_link || "",
   };
 }
+
+const fmtMeeting = (v: any) => {
+  if (!v) return "";
+  const d = new Date(v);
+  if (isNaN(d.getTime())) return "";
+  return d.toLocaleString("en-IN", {
+    day: "numeric", month: "short", year: "numeric",
+    hour: "numeric", minute: "2-digit", hour12: true,
+  });
+};
+
+const fmtMeetingTime = (v: any, tz?: string | null) => {
+  if (!v) return "";
+  const d = new Date(v);
+  if (isNaN(d.getTime())) return "";
+  const t = d.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true });
+  return tz ? `${t} ${tz}` : t;
+};
 
 /** Sample data used for the live preview in the admin (not sent anywhere). */
 export function sampleTemplateData(): Record<string, string> {
@@ -87,5 +128,26 @@ export function sampleTemplateData(): Record<string, string> {
     summary: "Scored 78/100 — strong fit for AI lead automation and follow-up.",
     date: fmtDate(new Date()),
     year: String(new Date().getFullYear()),
+    meetingDate: fmtMeeting(lead.meeting_date),
+    meetingTime: fmtMeetingTime(lead.meeting_date, lead.meeting_timezone),
+    meetingLink: lead.meeting_link || "",
   };
 }
+
+const fmtMeeting = (v: any) => {
+  if (!v) return "";
+  const d = new Date(v);
+  if (isNaN(d.getTime())) return "";
+  return d.toLocaleString("en-IN", {
+    day: "numeric", month: "short", year: "numeric",
+    hour: "numeric", minute: "2-digit", hour12: true,
+  });
+};
+
+const fmtMeetingTime = (v: any, tz?: string | null) => {
+  if (!v) return "";
+  const d = new Date(v);
+  if (isNaN(d.getTime())) return "";
+  const t = d.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true });
+  return tz ? `${t} ${tz}` : t;
+};
