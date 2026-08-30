@@ -96,6 +96,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <ChatWidget />
         <SpeedInsights />
         <Analytics />
+        {/* Vyravo visitor tracking — https://vyravo-tracker.vercel.app */}
+        <script src="https://vyravo-tracker.vercel.app/visitor-tracker.js" />
       </body>
     </html>
   );
