@@ -66,49 +66,51 @@ function prettifyIndustry(v?: string | null): string {
 const fmtDate = (d: Date) =>
   d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 
-/** Map a DB lead row → template variables. Never fabricates: missing = "". */
-export function leadToTemplateData(lead: Record<string, any>): Record<string, string> {
-  const full = lead.fullName || lead.businessName || "";
-  const firstName = full.trim().split(/\s+/)[0] || lead.businessName || "";
-  return {
-    firstName,
-    fullName: full,
-    company: lead.businessName || lead.fullName || "",
-    website: (lead.businessWebsite || "").replace(/^https?:\/\//, ""),
-    phone: lead.phone || "",
-    email: lead.email || "",
-    city: lead.city || "",
-    country: lead.country || "",
-    industry: prettifyIndustry(lead.industry),
-    score: lead.leadScore != null ? String(lead.leadScore) : "",
-    category: (lead.leadCategory || "").toUpperCase(),
-    challenge: lead.biggestChallenge || lead.qualificationSummary || "",
-    summary: lead.qualificationSummary || lead.additionalInfo || "",
-    date: fmtDate(new Date()),
-    year: String(new Date().getFullYear()),
-    meetingDate: fmtMeeting(lead.meeting_date),
-    meetingTime: fmtMeetingTime(lead.meeting_date, lead.meeting_timezone),
-    meetingLink: lead.meeting_link || "",
-  };
-}
-
-const fmtMeeting = (v: any) => {
+function fmtMeeting(v: unknown): string {
   if (!v) return "";
-  const d = new Date(v);
+  const d = new Date(String(v));
   if (isNaN(d.getTime())) return "";
   return d.toLocaleString("en-IN", {
     day: "numeric", month: "short", year: "numeric",
     hour: "numeric", minute: "2-digit", hour12: true,
   });
-};
+}
 
-const fmtMeetingTime = (v: any, tz?: string | null) => {
+function fmtMeetingTime(v: unknown, tz?: string | null): string {
   if (!v) return "";
-  const d = new Date(v);
+  const d = new Date(String(v));
   if (isNaN(d.getTime())) return "";
   const t = d.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true });
   return tz ? `${t} ${tz}` : t;
-};
+}
+
+/** Map a DB lead row (snake_case or camelCase) → template variables.
+ *  Never fabricates: missing = "". */
+export function leadToTemplateData(lead: Record<string, any>): Record<string, string> {
+  const full = lead.fullName || lead.full_name || lead.businessName || lead.business_name || "";
+  const firstName = full.trim().split(/\s+/)[0] || lead.businessName || lead.business_name || "";
+  const score = lead.leadScore ?? lead.lead_score;
+  return {
+    firstName,
+    fullName: full,
+    company: lead.businessName || lead.business_name || lead.fullName || lead.full_name || "",
+    website: (lead.businessWebsite || lead.business_website || "").replace(/^https?:\/\//, ""),
+    phone: lead.phone || "",
+    email: lead.email || "",
+    city: lead.city || "",
+    country: lead.country || "",
+    industry: prettifyIndustry(lead.industry),
+    score: score != null ? String(score) : "",
+    category: (lead.leadCategory || lead.lead_category || "").toUpperCase(),
+    challenge: lead.biggestChallenge || lead.biggest_challenge || lead.qualificationSummary || lead.qualification_summary || "",
+    summary: lead.qualificationSummary || lead.qualification_summary || lead.additionalInfo || lead.additional_info || "",
+    date: fmtDate(new Date()),
+    year: String(new Date().getFullYear()),
+    meetingDate: fmtMeeting(lead.meeting_date || lead.meetingDate),
+    meetingTime: fmtMeetingTime(lead.meeting_date || lead.meetingDate, lead.meeting_timezone || lead.meetingTimezone),
+    meetingLink: lead.meeting_link || lead.meetingLink || "",
+  };
+}
 
 /** Sample data used for the live preview in the admin (not sent anywhere). */
 export function sampleTemplateData(): Record<string, string> {
@@ -128,26 +130,8 @@ export function sampleTemplateData(): Record<string, string> {
     summary: "Scored 78/100 — strong fit for AI lead automation and follow-up.",
     date: fmtDate(new Date()),
     year: String(new Date().getFullYear()),
-    meetingDate: fmtMeeting(lead.meeting_date),
-    meetingTime: fmtMeetingTime(lead.meeting_date, lead.meeting_timezone),
-    meetingLink: lead.meeting_link || "",
+    meetingDate: "2 Sep 2026, 11:00 AM",
+    meetingTime: "11:00 AM IST",
+    meetingLink: "meet.google.com/abc-defg-hij",
   };
 }
-
-const fmtMeeting = (v: any) => {
-  if (!v) return "";
-  const d = new Date(v);
-  if (isNaN(d.getTime())) return "";
-  return d.toLocaleString("en-IN", {
-    day: "numeric", month: "short", year: "numeric",
-    hour: "numeric", minute: "2-digit", hour12: true,
-  });
-};
-
-const fmtMeetingTime = (v: any, tz?: string | null) => {
-  if (!v) return "";
-  const d = new Date(v);
-  if (isNaN(d.getTime())) return "";
-  const t = d.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true });
-  return tz ? `${t} ${tz}` : t;
-};
