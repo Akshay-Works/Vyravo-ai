@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
 
   const ghToken = (process.env.GITHUB_ACTIONS_TOKEN || "").trim();
   if (!ghToken) {
-    return Response.json({ error: "GITHUB_ACTIONS_TOKEN not set on this project" }, { status: 503 });
+    return Response.json({ error: "GITHUB_ACTIONS_TOKEN not set on this project (v2-deploy)" }, { status: 503 });
   }
 
   try {

@@ -1,0 +1,6 @@
+{
+  "crons": [
+    { "path": "/api/cron/kick-engine", "schedule": "0 4 * * *" },
+    { "path": "/api/cron/emails", "schedule": "0 2 * * *" }
+  ]
+}

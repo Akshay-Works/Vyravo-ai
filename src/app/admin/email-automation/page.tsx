@@ -1,4 +1,5 @@
 import { db } from "@/db";
+import ProcessQueueButton from "./ProcessQueueButton";
 import { emailQueue, communications } from "@/db/schema";
 import { desc } from "drizzle-orm";
 
@@ -25,9 +26,12 @@ export default async function EmailAutomationPage() {
             Real outbound engine: queued emails, processed by the email worker, delivered via Resend.
           </p>
         </div>
-        <a href="/admin/email-templates" className="rounded-lg border border-primary/40 px-4 py-2 text-sm text-primary hover:bg-primary/10">
-          Manage templates →
-        </a>
+        <div className="flex items-center gap-2">
+          <ProcessQueueButton />
+          <a href="/admin/email-templates" className="rounded-lg border border-primary/40 px-4 py-2 text-sm text-primary hover:bg-primary/10">
+            Manage templates →
+          </a>
+        </div>
       </div>
 
       <section>
