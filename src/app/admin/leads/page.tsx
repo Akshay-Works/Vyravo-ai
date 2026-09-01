@@ -1,6 +1,8 @@
+import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { leads } from "@/db/schema";
 import { desc } from "drizzle-orm";
+import { isAdminAuthenticated } from "@/lib/knowledge-base/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +13,7 @@ const scoreColor = (s: number) =>
   : "bg-zinc-500/15 text-zinc-400 border-zinc-500/30";
 
 export default async function AdminLeadsPage() {
+  if (!(await isAdminAuthenticated())) redirect("/admin/login");
   const rows = await db.select().from(leads).orderBy(desc(leads.createdAt)).limit(120);
   const engine = rows.filter((r) => r.source === "lead_engine");
   const other = rows.filter((r) => r.source !== "lead_engine");

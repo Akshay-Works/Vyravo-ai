@@ -43,7 +43,30 @@ export async function GET(request: NextRequest) {
       const text = await r.text().catch(() => "");
       return Response.json({ error: `GitHub dispatch failed (${r.status})`, detail: text.slice(0, 200) }, { status: 502 });
     }
-    return Response.json({ ok: true, dispatched: ENGINE_WORKFLOW_ID, at: new Date().toISOString() });
+
+    // Funnel 2 (LinkedIn + email/web discovery) — dispatched on the same Vercel
+    // cron since GitHub schedules are flaky. Uses the workflow file name.
+    let funnel2: any = { skipped: true, reason: "no GITHUB_ACTIONS_TOKEN variant" };
+    try {
+      const r2 = await fetch(
+        `https://api.github.com/repos/${ENGINE_REPO}/actions/workflows/funnel2-daily.yml/dispatches`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${ghToken}`,
+            Accept: "application/vnd.github+json",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ ref: "main" }),
+          signal: AbortSignal.timeout(15000),
+        }
+      );
+      funnel2 = r2.ok ? { dispatched: "funnel2-daily.yml" } : { error: `funnel2 dispatch failed (${r2.status})` };
+    } catch (e2: any) {
+      funnel2 = { error: e2.message };
+    }
+    console.log("kick-engine funnel2:", JSON.stringify(funnel2));
+    return Response.json({ ok: true, dispatched: ENGINE_WORKFLOW_ID, funnel2, at: new Date().toISOString() });
   } catch (e: any) {
     console.error("kick-engine error:", e.message);
     return Response.json({ error: "Failed" }, { status: 500 });
