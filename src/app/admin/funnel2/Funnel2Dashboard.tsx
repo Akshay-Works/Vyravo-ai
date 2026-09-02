@@ -49,6 +49,12 @@ const scoreColor = (s: number) =>
   : s >= 70 ? "bg-blue-500/15 text-blue-400 border-blue-500/30"
   : "bg-zinc-500/15 text-zinc-400 border-zinc-500/30";
 
+const queueBadge = (r: { linkedin_ready: boolean; email_ready: boolean }) =>
+  r.linkedin_ready && r.email_ready ? { label: "Both", cls: "bg-green-500/15 text-green-400 border-green-500/30" }
+  : r.linkedin_ready ? { label: "LinkedIn", cls: "bg-blue-500/15 text-blue-400 border-blue-500/30" }
+  : r.email_ready ? { label: "Email", cls: "bg-cyan-500/15 text-cyan-400 border-cyan-500/30" }
+  : { label: "None", cls: "bg-zinc-500/15 text-zinc-500 border-zinc-500/30" };
+
 function copy(text: string) {
   navigator.clipboard?.writeText(text).catch(() => {});
 }
@@ -59,7 +65,7 @@ export function Funnel2Dashboard() {
   const [facets, setFacets] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [f, setF] = useState({ country: "", city: "", industry: "", status: "", minScore: "70", hasLinkedin: "", hasEmail: "", q: "" });
+  const [f, setF] = useState({ country: "", city: "", industry: "", status: "", minScore: "70", queue: "", hasLinkedin: "", hasEmail: "", q: "" });
   const [page, setPage] = useState(0);
   const [expanded, setExpanded] = useState<number | null>(null);
   const [showSettings, setShowSettings] = useState(false);
@@ -78,6 +84,7 @@ export function Funnel2Dashboard() {
       if (f.industry) sp.set("industry", f.industry);
       if (f.status) sp.set("status", f.status);
       if (f.minScore) sp.set("minScore", f.minScore);
+      if (f.queue) sp.set("queue", f.queue);
       if (f.hasLinkedin) sp.set("hasLinkedin", "1");
       if (f.hasEmail) sp.set("hasEmail", "1");
       sp.set("limit", "100");
@@ -212,7 +219,7 @@ export function Funnel2Dashboard() {
       {stats && (
         <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-5">
           <Card label="Total leads" value={stats.total} sub={`${stats.new_today} discovered today`} />
-          <Card label="Qualified 70+" value={stats.qualified} sub={`${stats.with_linkedin} with LinkedIn · ${stats.with_email} with email`} />
+          <Card label="Qualified 70+" value={stats.qualified} sub={`${stats.queue_both ?? 0} Both · ${stats.queue_linkedin ?? 0} LinkedIn · ${stats.queue_email ?? 0} Email`} />
           <Card label="Contacted" value={stats.contacted} sub={`${stats.replies} replies`} />
           <Card label="Calls booked" value={stats.calls_booked} sub={`${stats.won} won`} />
           <Card label="Conversion" value={stats.conversionRate} sub={`${stats.dnc} do-not-contact`} />
@@ -238,6 +245,13 @@ export function Funnel2Dashboard() {
             {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
           <input type="number" placeholder="Min score" value={f.minScore} onChange={(e) => { setF({ ...f, minScore: e.target.value }); setPage(0); }} className="w-24 rounded-lg border border-border bg-[#0b0e14] px-2 py-1.5 text-xs text-zinc-200" />
+          <select value={f.queue} onChange={(e) => { setF({ ...f, queue: e.target.value }); setPage(0); }} className="rounded-lg border border-border bg-[#0b0e14] px-2 py-1.5 text-xs text-zinc-200">
+            <option value="">All queues</option>
+            <option value="both">Both (Li + Email)</option>
+            <option value="linkedin">LinkedIn only</option>
+            <option value="email">Email only</option>
+            <option value="none">No channel</option>
+          </select>
           <label className="flex items-center gap-1 text-xs text-grey">
             <input type="checkbox" checked={f.hasLinkedin === "1"} onChange={(e) => { setF({ ...f, hasLinkedin: e.target.checked ? "1" : "" }); setPage(0); }} /> LinkedIn
           </label>
@@ -289,6 +303,9 @@ export function Funnel2Dashboard() {
                   {r.lead_score >= 70 && <div className="mt-0.5 text-[10px] text-green-400/80">outreach</div>}
                 </td>
                 <td className="p-3">
+                  {(() => { const q = queueBadge(r); return (
+                    <span className={`mb-1 inline-block rounded-full border px-2 py-0.5 text-[10px] font-semibold ${q.cls}`}>{q.label}</span>
+                  ); })()}
                   <div className="flex flex-col gap-0.5 text-xs">
                     {r.linkedin_profile ? (
                       <span className="flex items-center gap-1">

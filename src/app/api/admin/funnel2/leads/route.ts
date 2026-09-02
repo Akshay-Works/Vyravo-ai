@@ -33,6 +33,12 @@ export async function GET(request: NextRequest) {
     if (g("minScore")) add("lead_score >= ?", Number(g("minScore")));
     if (g("hasLinkedin") === "1") conds.push("linkedin_profile IS NOT NULL");
     if (g("hasEmail") === "1") conds.push("email IS NOT NULL");
+    // outreach queue: both / linkedin (ready) / email (ready)
+    const queue = g("queue");
+    if (queue === "both") conds.push("linkedin_ready = true AND email_ready = true");
+    else if (queue === "linkedin") conds.push("linkedin_ready = true AND email_ready = false");
+    else if (queue === "email") conds.push("email_ready = true AND linkedin_ready = false");
+    else if (queue === "none") conds.push("linkedin_ready = false AND email_ready = false");
     const where = conds.length ? "WHERE " + conds.join(" AND ") : "";
     const limit = Math.min(Math.max(Number(g("limit") || "200"), 1), 500);
     params.push(limit);
@@ -49,7 +55,10 @@ export async function GET(request: NextRequest) {
         count(*) FILTER (WHERE status = 'WON')::int won,
         count(*) FILTER (WHERE status = 'DO_NOT_CONTACT')::int dnc,
         count(*) FILTER (WHERE email IS NOT NULL)::int with_email,
-        count(*) FILTER (WHERE linkedin_profile IS NOT NULL)::int with_linkedin
+        count(*) FILTER (WHERE linkedin_profile IS NOT NULL)::int with_linkedin,
+        count(*) FILTER (WHERE linkedin_ready = true AND email_ready = true)::int queue_both,
+        count(*) FILTER (WHERE linkedin_ready = true AND email_ready = false)::int queue_linkedin,
+        count(*) FILTER (WHERE email_ready = true AND linkedin_ready = false)::int queue_email
       FROM funnel2_leads`),
       pool.query(`SELECT DISTINCT country, city, industry FROM funnel2_leads ORDER BY 1, 2, 3 LIMIT 500`),
     ]);
