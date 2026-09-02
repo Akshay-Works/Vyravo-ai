@@ -58,6 +58,15 @@ export default function AnalyticsDashboardPage() {
   const activity = data.activity || [];
   const revenueTrend = data.revenueTrend || [];
   const leadTrends = data.leadTrends || [];
+  const f2 = data.funnel2 || {};
+  const f2s = f2.stats || {};
+  const f2q = f2.queues || [];
+  const f2day = f2.byDay || [];
+  const f2runs = f2.runs || [];
+  const eng = data.engine || {};
+  const engS = eng.stats || {};
+  const engSources = eng.sources || [];
+  const engDay = eng.byDay || [];
 
   return (
     <div className="space-y-8">
@@ -105,6 +114,130 @@ export default function AnalyticsDashboardPage() {
             <KpiCard title="Proposals Accepted" value={ov.proposalsAccepted?.value} prev={ov.proposalsAccepted?.prev} icon="🎉" />
             <KpiCard title="Active Clients" value={ov.activeClients} icon="🏢" />
             <KpiCard title="Active Projects" value={ov.activeProjects} icon="📋" />
+          </div>
+
+          {/* ================= LEAD ENGINES (Funnel 1 + Funnel 2) ================= */}
+          <div className="rounded-xl border border-border bg-surface p-5">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+              <div>
+                <h2 className="text-lg font-semibold font-[var(--font-heading)]">Lead Engines <span className="gradient-text">(daily 9:30 AM)</span></h2>
+                <p className="text-xs text-grey">Funnel 2 = LinkedIn + Email pipeline · Funnel 1 = engine leads · synced from the same database</p>
+              </div>
+              <div className="flex gap-2">
+                <Link href="/admin/funnel2" className="text-xs px-3 py-1.5 rounded-lg border border-primary/40 text-primary hover:bg-primary/10">Funnel 2 admin →</Link>
+                <Link href="/admin/leads" className="text-xs px-3 py-1.5 rounded-lg border border-primary/40 text-primary hover:bg-primary/10">Engine leads →</Link>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
+              <KpiCard title="F2 Total (period)" value={f2s.total} icon="🧲" />
+              <KpiCard title="F2 Qualified 70+" value={f2s.qualified} icon="✅" />
+              <KpiCard title="F2 Avg Score" value={f2s.avg_qualified_score} icon="📊" />
+              <KpiCard title="F2 Contacted" value={f2s.contacted} icon="📞" />
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
+              <KpiCard title="Queue: Both" value={f2s.queue_both} icon="🔗" />
+              <KpiCard title="Queue: LinkedIn" value={f2s.queue_linkedin} icon="💼" />
+              <KpiCard title="Queue: Email" value={f2s.queue_email} icon="✉️" />
+              <KpiCard title="Queue: No channel" value={f2s.queue_none} icon="🕳️" />
+            </div>
+
+            <div className="grid lg:grid-cols-2 gap-6">
+              <div>
+                <h3 className="text-sm font-semibold mb-3 text-zinc-200">Funnel 2 — discovered vs qualified per day</h3>
+                {f2day.length === 0 ? <p className="text-sm text-grey-dark py-8 text-center">No Funnel 2 data for this period.</p> : (
+                  <ResponsiveContainer width="100%" height={200}>
+                    <BarChart data={f2day}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#222" />
+                      <XAxis dataKey="date" tick={{ fontSize: 9, fill: "#888" }} tickFormatter={(v: string) => v.slice(5)} />
+                      <YAxis tick={{ fontSize: 10, fill: "#888" }} />
+                      <Tooltip contentStyle={{ backgroundColor: "#111", border: "1px solid #333", borderRadius: 8, color: "#fff" }} />
+                      <Legend wrapperStyle={{ fontSize: 11 }} />
+                      <Bar dataKey="discovered" fill="#8B5CF6" radius={[3, 3, 0, 0]} />
+                      <Bar dataKey="qualified" fill="#10B981" radius={[3, 3, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold mb-3 text-zinc-200">Funnel 2 — outreach queue split</h3>
+                {f2q.length === 0 ? <p className="text-sm text-grey-dark py-8 text-center">No queue data yet.</p> : (
+                  <ResponsiveContainer width="100%" height={200}>
+                    <PieChart>
+                      <Pie data={f2q} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={72} label={(props: any) => `${props.name}: ${props.value}`}>
+                        {f2q.map((_: any, i: number) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                      </Pie>
+                      <Tooltip contentStyle={{ backgroundColor: "#111", border: "1px solid #333", borderRadius: 8, color: "#fff" }} />
+                      <Legend wrapperStyle={{ fontSize: 11 }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+            </div>
+
+            <div className="grid lg:grid-cols-2 gap-6 mt-5">
+              <div>
+                <h3 className="text-sm font-semibold mb-3 text-zinc-200">Funnel 2 — daily runs</h3>
+                {f2runs.length === 0 ? <p className="text-sm text-grey-dark py-6 text-center">No runs recorded yet.</p> : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-border text-left text-[10px] uppercase tracking-wider text-grey-dark">
+                          <th className="p-2">Run</th><th className="p-2">Started</th><th className="p-2">Candidates</th><th className="p-2">Qualified</th><th className="p-2">Dupes</th><th className="p-2">Status</th><th className="p-2">Time</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {f2runs.map((r: any) => (
+                          <tr key={r.id} className="border-b border-border/60 last:border-0">
+                            <td className="p-2 text-zinc-200">#{r.id}</td>
+                            <td className="p-2 text-grey">{new Date(r.started_at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</td>
+                            <td className="p-2 text-grey">{r.candidates ?? "—"}</td>
+                            <td className="p-2 text-emerald-400">{r.qualified ?? "—"}</td>
+                            <td className="p-2 text-grey">{r.duplicates ?? "—"}</td>
+                            <td className="p-2"><span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${r.status === "SUCCESS" ? "border-green-500/30 text-green-400" : r.status === "LIMITED" ? "border-amber-500/30 text-amber-400" : "border-red-500/30 text-red-400"}`}>{r.status || "—"}</span></td>
+                            <td className="p-2 text-grey">{(r.runtime_sec || 0) / 60 > 1 ? `${Math.round((r.runtime_sec || 0) / 60)}m` : `${r.runtime_sec || 0}s`}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold mb-3 text-zinc-200">Funnel 1 — engine leads</h3>
+                {engDay.length === 0 && Object.keys(engS).length === 0 ? <p className="text-sm text-grey-dark py-6 text-center">No engine lead data.</p> : (
+                  <>
+                    <div className="grid grid-cols-3 gap-3 mb-4">
+                      <KpiCard title="Total" value={engS.total} icon="👥" />
+                      <KpiCard title="Hot 90+" value={engS.hot} icon="🔥" />
+                      <KpiCard title="High 75-89" value={engS.high} icon="⭐" />
+                    </div>
+                    {engDay.length > 0 && (
+                      <ResponsiveContainer width="100%" height={150}>
+                        <BarChart data={engDay}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#222" />
+                          <XAxis dataKey="date" tick={{ fontSize: 9, fill: "#888" }} tickFormatter={(v: string) => v.slice(5)} />
+                          <YAxis tick={{ fontSize: 10, fill: "#888" }} />
+                          <Tooltip contentStyle={{ backgroundColor: "#111", border: "1px solid #333", borderRadius: 8, color: "#fff" }} />
+                          <Bar dataKey="count" fill="#06B6D4" radius={[3, 3, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    )}
+                    {engSources.length > 0 && (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {engSources.map((src: any, i: number) => (
+                          <span key={src.name} className="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-[11px] text-grey">
+                            <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                            {src.name}: {src.count}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
           </div>
 
           <div className="grid lg:grid-cols-2 gap-6">

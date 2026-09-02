@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { isAdminAuthenticated } from "@/lib/knowledge-base/auth";
 import { getDashboard, getRevenueByService, getLeadTrends, getRevenueTrend, getRecentActivity, getAlerts } from "@/lib/analytics/engine";
+import { getFunnel2Analytics, getEngineLeadsAnalytics } from "@/lib/analytics/funnel2";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,8 @@ export async function GET(request: NextRequest) {
     if (section === "all" || section === "activity") data.activity = await getRecentActivity();
     if (section === "all" || section === "alerts") data.alerts = await getAlerts();
     if (section === "all" || section === "services") data.services = await getRevenueByService();
+    if (section === "all" || section === "funnel2") data.funnel2 = await getFunnel2Analytics(filter);
+    if (section === "all" || section === "funnel2") data.engine = await getEngineLeadsAnalytics(filter);
 
     return Response.json(data);
   } catch (e) {
