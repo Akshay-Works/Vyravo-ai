@@ -59,6 +59,15 @@ function copy(text: string) {
   navigator.clipboard?.writeText(text).catch(() => {});
 }
 
+function downloadCsv(url: string) {
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
 export function Funnel2Dashboard() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [stats, setStats] = useState<any>(null);
@@ -126,6 +135,25 @@ export function Funnel2Dashboard() {
     }
   }, []);
 
+  const exportUrl = useCallback((queue: string) => {
+    const sp = new URLSearchParams();
+    sp.set("queue", queue);
+    if (f.country) sp.set("country", f.country);
+    if (f.city) sp.set("city", f.city);
+    if (f.industry) sp.set("industry", f.industry);
+    if (f.status) sp.set("status", f.status);
+    if (f.minScore) sp.set("minScore", f.minScore);
+    if (f.hasLinkedin) sp.set("hasLinkedin", "1");
+    if (f.hasEmail) sp.set("hasEmail", "1");
+    if (f.q) sp.set("q", f.q);
+    return `/api/admin/funnel2/export?${sp}`;
+  }, [f]);
+
+  const setQueue = (q: string) => {
+    setF((prev) => ({ ...prev, queue: prev.queue === q ? "" : q }));
+    setPage(0);
+  };
+
   const saveCfg = useCallback(async () => {
     setCfgMsg("saving…");
     try {
@@ -180,6 +208,7 @@ export function Funnel2Dashboard() {
           <button onClick={() => setShowSettings(!showSettings)} className="rounded-lg border border-border bg-surface px-3 py-1.5 text-xs text-zinc-200 hover:border-zinc-500">
             {showSettings ? "Hide settings" : "⚙ Settings"}
           </button>
+          <button onClick={() => downloadCsv(exportUrl(f.queue))} className="rounded-lg border border-border bg-surface px-3 py-1.5 text-xs text-zinc-200 hover:border-zinc-500" title="Export current view (all filters) as CSV">CSV ⬇</button>
           <button onClick={load} className="rounded-lg border border-border bg-surface px-3 py-1.5 text-xs text-zinc-200 hover:border-zinc-500">↻ Refresh</button>
         </div>
       </div>
@@ -213,6 +242,33 @@ export function Funnel2Dashboard() {
             <button onClick={saveCfg} className="rounded-lg bg-blue-600 px-4 py-1.5 text-xs font-medium text-white hover:bg-blue-500">Save settings</button>
             {cfgMsg && <span className="text-xs text-grey">{cfgMsg}</span>}
           </div>
+        </div>
+      )}
+
+      {stats && (
+        <div className="mb-3 grid grid-cols-2 gap-3 rounded-xl border border-border bg-surface p-3 md:grid-cols-4">
+          {[
+            { key: "both", label: "Both (Li + Email)", n: stats.queue_both, color: "text-green-400 border-green-500/30" },
+            { key: "linkedin", label: "LinkedIn-ready", n: stats.queue_linkedin, color: "text-blue-400 border-blue-500/30" },
+            { key: "email", label: "Email-ready", n: stats.queue_email, color: "text-cyan-400 border-cyan-500/30" },
+            { key: "none", label: "No channel", n: stats.queue_none, color: "text-zinc-400 border-zinc-500/30" },
+          ].map((qk) => (
+            <button key={qk.key} onClick={() => setQueue(qk.key)}
+              className={`rounded-lg border p-3 text-left transition hover:border-zinc-500 ${f.queue === qk.key ? "border-zinc-300 bg-white/[0.04]" : "border-border"}`}>
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] uppercase tracking-wider text-grey-dark">Outreach queue</span>
+                <span className={`text-[10px] font-semibold ${qk.color}`}>{qk.label}</span>
+              </div>
+              <div className={`mt-1 text-2xl font-semibold ${qk.color.split(" ")[0]}`}>{qk.n ?? 0}</div>
+              <div className="mt-1 flex items-center gap-2">
+                <span className="text-[10px] text-grey">{f.queue === qk.key ? "filtering — click to clear" : "click to filter"}</span>
+                <button onClick={(e) => { e.stopPropagation(); downloadCsv(exportUrl(qk.key)); }}
+                  className="ml-auto rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-300 hover:bg-zinc-700" title={`Export ${qk.label} CSV`}>
+                  csv ⬇
+                </button>
+              </div>
+            </button>
+          ))}
         </div>
       )}
 

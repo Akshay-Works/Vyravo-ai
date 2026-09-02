@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { isAdminAuthenticated } from "@/lib/knowledge-base/auth";
+import { buildLeadFilters, whereClause } from "@/lib/funnel2/filters";
 import { pool } from "@/db";
 
 export const dynamic = "force-dynamic";
@@ -21,27 +22,10 @@ export async function GET(request: NextRequest) {
       created_at timestamptz DEFAULT now(), updated_at timestamptz DEFAULT now())`);
 
     const sp = request.nextUrl.searchParams;
-    const conds: string[] = [];
-    const params: any[] = [];
-    const add = (sql: string, v: any) => { params.push(v); conds.push(sql.replace("?", `$${params.length}`)); };
-    const g = (k: string) => (sp.get(k) || "").trim();
-    if (g("country")) add("country = ?", g("country"));
-    if (g("city")) add("city = ?", g("city"));
-    if (g("industry")) add("industry = ?", g("industry"));
-    if (g("status")) add("status = ?", g("status"));
-    if (g("source")) add("lead_source ILIKE ?", "%" + g("source") + "%");
-    if (g("minScore")) add("lead_score >= ?", Number(g("minScore")));
-    if (g("hasLinkedin") === "1") conds.push("linkedin_profile IS NOT NULL");
-    if (g("hasEmail") === "1") conds.push("email IS NOT NULL");
-    // outreach queue: both / linkedin (ready) / email (ready)
-    const queue = g("queue");
-    if (queue === "both") conds.push("linkedin_ready = true AND email_ready = true");
-    else if (queue === "linkedin") conds.push("linkedin_ready = true AND email_ready = false");
-    else if (queue === "email") conds.push("email_ready = true AND linkedin_ready = false");
-    else if (queue === "none") conds.push("linkedin_ready = false AND email_ready = false");
-    const where = conds.length ? "WHERE " + conds.join(" AND ") : "";
-    const limit = Math.min(Math.max(Number(g("limit") || "200"), 1), 500);
-    params.push(limit);
+    const f = buildLeadFilters(sp);
+    const where = whereClause(f);
+    const limit = Math.min(Math.max(Number((sp.get("limit") || "200")), 1), 500);
+    const params = [...f.params, limit];
 
     const [leads, stats, facets] = await Promise.all([
       pool.query(`SELECT * FROM funnel2_leads ${where} ORDER BY lead_score DESC, id DESC LIMIT $${params.length}`, params),
@@ -58,13 +42,14 @@ export async function GET(request: NextRequest) {
         count(*) FILTER (WHERE linkedin_profile IS NOT NULL)::int with_linkedin,
         count(*) FILTER (WHERE linkedin_ready = true AND email_ready = true)::int queue_both,
         count(*) FILTER (WHERE linkedin_ready = true AND email_ready = false)::int queue_linkedin,
-        count(*) FILTER (WHERE email_ready = true AND linkedin_ready = false)::int queue_email
+        count(*) FILTER (WHERE email_ready = true AND linkedin_ready = false)::int queue_email,
+        count(*) FILTER (WHERE linkedin_ready = false AND email_ready = false)::int queue_none
       FROM funnel2_leads`),
       pool.query(`SELECT DISTINCT country, city, industry FROM funnel2_leads ORDER BY 1, 2, 3 LIMIT 500`),
     ]);
     const s: any = stats.rows[0];
     s.conversionRate = s.total ? ((s.won || 0) / s.total * 100).toFixed(1) + "%" : "0%";
-    return Response.json({ leads: leads.rows, stats: s, facets: facets.rows });
+    return Response.json({ leads: leads.rows, stats: s, facets: facets.rows, queue: sp.get("queue") || "" });
   } catch (e: any) {
     console.error("funnel2 list error:", e);
     return Response.json({ error: "Failed to load leads" }, { status: 500 });
