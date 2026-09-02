@@ -21,13 +21,14 @@ const DEFAULTS = {
   dailyTarget: 50,
   maxSitesAnalyzed: 40,
   maxDmLookups: 15,
-  maxSearchQueries: 12,
+  maxSearchQueries: 10,
+  maxWebLookups: 6,
   braveQueries: 10,
   reportEmail: "",
   senderEmail: "onboarding@resend.dev",
 };
 
-const EDITABLE = ["targetCountries", "targetCities", "minScore", "dailyTarget", "maxSitesAnalyzed", "maxDmLookups", "maxSearchQueries", "braveQueries", "reportEmail", "senderEmail", "industries"];
+const EDITABLE = ["targetCountries", "targetCities", "minScore", "dailyTarget", "maxSitesAnalyzed", "maxDmLookups", "maxSearchQueries", "maxWebLookups", "braveQueries", "reportEmail", "senderEmail", "industries"];
 
 export async function GET() {
   if (!(await isAdminAuthenticated())) return Response.json({ error: "Unauthorized" }, { status: 401 });
@@ -51,7 +52,7 @@ export async function PUT(request: NextRequest) {
   const out: any = {};
   for (const k of EDITABLE) {
     if (k in body) {
-      if (["minScore", "dailyTarget", "maxSitesAnalyzed", "maxDmLookups", "maxSearchQueries", "braveQueries"].includes(k)) {
+      if (["minScore", "dailyTarget", "maxSitesAnalyzed", "maxDmLookups", "maxSearchQueries", "maxWebLookups", "braveQueries"].includes(k)) {
         const n = Number(body[k]);
         if (!Number.isFinite(n) || n < 1 || n > 500) return Response.json({ error: `Bad ${k}` }, { status: 400 });
         out[k] = Math.round(n);
