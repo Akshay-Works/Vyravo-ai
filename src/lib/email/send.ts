@@ -18,6 +18,11 @@ export interface EmailOptions {
   replyTo?: string;
 }
 
+// Outbound emails are ALWAYS addressed to the selected lead/client.
+// This address is only ever the REPLY-TO (where replies from the lead land),
+// never a fallback recipient.
+export const DEFAULT_REPLY_TO = process.env.ADMIN_REPLY_TO || "akshay.navale.work@gmail.com";
+
 export function isResendConfigured(): boolean {
   return Boolean(process.env.RESEND_API_KEY);
 }
@@ -51,7 +56,7 @@ export async function sendEmail(options: EmailOptions): Promise<{ sent: boolean;
           subject: options.subject,
           html: options.html || options.text,
           text: options.text || options.html?.replace(/<[^>]*>/g, ""),
-          reply_to: options.replyTo || "akshay.navale.work@gmail.com",
+          reply_to: options.replyTo || DEFAULT_REPLY_TO,
         }),
         signal: AbortSignal.timeout(10000),
       });
@@ -74,7 +79,7 @@ export async function sendEmail(options: EmailOptions): Promise<{ sent: boolean;
       from, to: options.to, subject: options.subject,
       html: options.html || options.text,
       text: options.text || options.html?.replace(/<[^>]*>/g, ""),
-      replyTo: options.replyTo || "akshay.navale.work@gmail.com",
+      replyTo: options.replyTo || DEFAULT_REPLY_TO,
     });
     return { sent: true, provider: "gmail" };
   } catch (e: any) {

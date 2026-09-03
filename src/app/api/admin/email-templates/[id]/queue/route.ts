@@ -28,9 +28,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
          AND status NOT IN ('contacted', 'won', 'lost', 'do_not_contact')`,
       [leadIds]
     );
+    const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     let queued = 0;
     let skipped = 0;
     for (const lead of l.rows) {
+      // Server-side guard: only ever enqueue to the lead's own, valid email
+      if (!EMAIL_RE.test(String(lead.email || "").trim())) { skipped++; continue; }
       const data = leadToTemplateData(lead);
       const subject = renderTemplate(template.subject, data);
       const html = renderTemplate(template.body, data, { html: true });

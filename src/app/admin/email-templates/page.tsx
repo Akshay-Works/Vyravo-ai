@@ -63,8 +63,7 @@ export default function EmailTemplatesPage() {
   const [queuing, setQueuing] = useState(false);
   const [notice, setNotice] = useState("");
 
-  // test-send to self
-  const [testTo, setTestTo] = useState("");
+  // send to the selected lead
   const [testing, setTesting] = useState(false);
   const [testMsg, setTestMsg] = useState("");
 
@@ -191,19 +190,25 @@ export default function EmailTemplatesPage() {
     }
   };
 
-  const sendTest = async () => {
+  // Sends to the SELECTED LEAD's own email (the server resolves the
+  // recipient from the lead row — never the admin's own address).
+  const sendToLead = async () => {
     if (!editing) return;
+    if (!previewLead) { setTestMsg("Select a lead first."); return; }
+    const email = (previewLead.email || "").trim();
+    if (!email) { setTestMsg("Lead has no email address — pick a lead with an email."); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setTestMsg("Lead email address is invalid."); return; }
     setTesting(true);
     setTestMsg("");
     try {
       const r = await fetch(`/api/admin/email-templates/${editing.id}/test`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ to: testTo, leadId: previewLead?.id, subject, body }),
+        body: JSON.stringify({ leadId: previewLead.id, subject, body }),
       });
       const d = await r.json();
       if (!r.ok) { setTestMsg(d.error || "Send failed"); return; }
-      setTestMsg(`✓ Sent via ${d.provider} — ${d.subject}`);
+      setTestMsg(`✓ Sent to ${d.to} via ${d.provider} — ${d.subject}`);
     } catch {
       setTestMsg("Send failed — network error");
     } finally {
@@ -339,17 +344,19 @@ export default function EmailTemplatesPage() {
               <div className="prose-sm mt-2 text-sm text-slate-700" dangerouslySetInnerHTML={{ __html: renderedPreview.body || "<p>(body)</p>" }} />
             </div>
             <div className="rounded-lg border border-border p-3">
-              <p className="text-xs text-grey">🧪 Send this exact version (unsaved edits included) to yourself:</p>
+              <p className="text-xs text-grey">📨 Send this exact version (unsaved edits included) to the selected lead:</p>
               <div className="mt-2 flex gap-2">
-                <input value={testTo} onChange={(e) => setTestTo(e.target.value)} placeholder="you@example.com"
-                  className="flex-1 rounded-lg border border-border bg-bg px-3 py-1.5 text-sm text-white" />
-                <button onClick={sendTest} disabled={testing || !editing}
+                <button onClick={sendToLead} disabled={testing || !editing}
                   className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50">
-                  {testing ? "Sending…" : "Send test"}
+                  {testing ? "Sending…" : "Send to lead"}
                 </button>
               </div>
+              <div className="mt-2 space-y-0.5 text-[11px] text-grey-dark">
+                <p><span className="text-grey">To:</span> {previewLead?.email || "— (select a lead above; sample data is never sent)"}</p>
+                <p><span className="text-grey">Reply-To:</span> akshay.navale.work@gmail.com</p>
+              </div>
               {testMsg && <p className={`mt-2 text-xs ${testMsg.startsWith("✓") ? "text-green-400" : "text-red-400"}`}>{testMsg}</p>}
-              <p className="mt-1 text-[11px] text-grey-dark">Uses {previewLead ? `lead: ${previewLead.business_name || previewLead.full_name}` : "sample data"} — pick a lead above to test with real data.</p>
+              <p className="mt-1 text-[11px] text-grey-dark">Never falls back to your own address — if the selected lead has no email, sending is blocked.</p>
             </div>
             <p className="text-xs text-grey">Values come from real lead data (score, company, challenge…). Nothing is fabricated — empty fields stay empty.</p>
           </div>
