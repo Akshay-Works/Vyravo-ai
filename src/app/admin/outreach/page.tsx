@@ -8,6 +8,7 @@ type Event = {
   status: string; error_message: string | null;
   follow_up_number: number;
   queued_at: string | null; sent_at: string | null; failed_at: string | null;
+  delivered_at: string | null;
   test_send: boolean;
   full_name: string | null; business_name: string | null;
   lead_score: number | null; lead_status: string | null;
@@ -261,6 +262,7 @@ export default function OutreachPage() {
                 </div>
                 <p className="mt-1.5 text-[10px] text-grey-dark">
                   {ev.sent_at ? `sent ${new Date(ev.sent_at).toLocaleString("en-IN")}` : ev.failed_at ? `failed ${new Date(ev.failed_at).toLocaleString("en-IN")}` : `queued ${ev.queued_at ? new Date(ev.queued_at).toLocaleString("en-IN") : ""}`}
+                  {ev.delivered_at ? ` · delivered ${new Date(ev.delivered_at).toLocaleString("en-IN")}` : ""}
                 </p>
               </div>
             ))}

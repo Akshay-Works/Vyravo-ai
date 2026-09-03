@@ -36,6 +36,7 @@ export async function ensureOutreachSchema(): Promise<void> {
     )`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_outreach_events_status ON outreach_events(status)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_outreach_events_sent ON outreach_events(sent_at)`);
+  await pool.query(`ALTER TABLE outreach_events ADD COLUMN IF NOT EXISTS delivered_at timestamptz`);
   await pool.query(`CREATE TABLE IF NOT EXISTS outreach_config (k text PRIMARY KEY, v text NOT NULL)`);
 }
 
@@ -194,16 +195,19 @@ export async function scheduleFollowUps(cfg: OutreachConfig): Promise<number> {
   const days = cfg.follow_up_days.length ? cfg.follow_up_days : [3, 7];
   let scheduled = 0;
   for (let n = 0; n < days.length; n++) {
-    const delayDays = n === 0 ? days[0] : days[n]; // follow-up n+1 fires delayDays after the nth email
+    // Follow-up (n+1) fires `days[n]` days AFTER THE INTRO EMAIL was sent —
+    // matches the spec: Email 1 → Day 0, Follow-up 1 → Day 3, Follow-up 2 → Day 7.
     const r = await pool.query(
       `SELECT e.* FROM outreach_events e
        JOIN leads l ON l.id = e.lead_id
+       JOIN outreach_events e0 ON e0.lead_id = e.lead_id AND e0.follow_up_number = 0
+            AND e0.status = 'sent' AND e0.test_send = false
        WHERE e.follow_up_number = $1 AND e.status = 'sent' AND e.test_send = false
-         AND e.sent_at + ($2 || ' days')::interval <= now()
+         AND e0.sent_at + ($2 || ' days')::interval <= now()
          AND COALESCE(l.status, 'active') NOT IN (${BLOCKED_STATUSES.map((_, i) => `$${i + 3}`).join(",")})
          AND NOT EXISTS (SELECT 1 FROM outreach_events e2 WHERE e2.lead_id = e.lead_id AND e2.follow_up_number = $1 + 1)
        LIMIT 100`,
-      [n, delayDays, ...BLOCKED_STATUSES]
+      [n, days[n], ...BLOCKED_STATUSES]
     );
     for (const ev of r.rows) {
       const lead = await pool.query(`SELECT * FROM leads WHERE id = $1`, [ev.lead_id]);
@@ -234,7 +238,7 @@ export async function scheduleFollowUps(cfg: OutreachConfig): Promise<number> {
 // ---------------------------------------------------------------------------
 // SEND — controlled, rate-limited, limit-capped, test-mode aware
 // ---------------------------------------------------------------------------
-export async function processOutreachQueue(cfg: OutreachConfig): Promise<{ sent: number; failed: number; skipped: number; capped: boolean }> {
+export async function processOutreachQueue(cfg: OutreachConfig): Promise<{ sent: number; failed: number; skipped: number; capped: boolean; testMode: boolean }> {
   await ensureOutreachSchema();
   const rows = await pool.query(
     `SELECT q.* FROM email_queue q
@@ -255,9 +259,21 @@ export async function processOutreachQueue(cfg: OutreachConfig): Promise<{ sent:
 
   let sent = 0, failed = 0, skipped = 0;
   let lastSendAt = 0;
+  const gap = cfg.min_gap_secs * 1000;
   for (const row of batch) {
     const data = row.template_data || {};
     const eventId = Number(data.outreach_event_id);
+
+    // ================= TEST MODE = dry run =================
+    // Deliver to the test recipient but NEVER mutate event/queue state: the
+    // same rows stay pending so the REAL send to the lead still happens once
+    // test mode is switched off. A test send must never consume a lead.
+    if (cfg.test_mode) {
+      const result = await sendEmail({ to: cfg.test_recipient, subject: data.subject || "Vyravo AI", html: data.html, replyTo: DEFAULT_REPLY_TO });
+      if (result.sent) sent++; else failed++;
+      continue;
+    }
+    // ================= PRODUCTION send =================
     // duplicate protection at send-time: only a still-queued event may be sent
     const ev = await pool.query(`SELECT id, status FROM outreach_events WHERE id = $1`, [eventId]);
     if ((ev.rowCount ?? 0) === 0 || ev.rows[0].status !== "queued") {
@@ -265,7 +281,7 @@ export async function processOutreachQueue(cfg: OutreachConfig): Promise<{ sent:
       skipped++;
       continue;
     }
-    const to = cfg.test_mode ? cfg.test_recipient : String(data.to || "");
+    const to = String(data.to || "");
     if (!to || !EMAIL_RE.test(to)) {
       await pool.query(`UPDATE email_queue SET status = 'failed', template_data = template_data || '{"error":"invalid recipient"}'::jsonb WHERE id = $1`, [row.id]);
       await pool.query(`UPDATE outreach_events SET status = 'failed', error_message = 'invalid recipient', failed_at = now() WHERE id = $1`, [eventId]);
@@ -273,7 +289,6 @@ export async function processOutreachQueue(cfg: OutreachConfig): Promise<{ sent:
       continue;
     }
     // min gap between sends
-    const gap = cfg.min_gap_secs * 1000;
     if (sent + failed > 0 && gap > 0) {
       const wait = Math.max(0, gap - (Date.now() - lastSendAt));
       if (wait > 0) await new Promise((r) => setTimeout(r, wait));
@@ -283,15 +298,16 @@ export async function processOutreachQueue(cfg: OutreachConfig): Promise<{ sent:
     if (result.sent) {
       await pool.query(`UPDATE email_queue SET status = 'sent', sent_at = now() WHERE id = $1`, [row.id]);
       await pool.query(
-        `UPDATE outreach_events SET status = 'sent', sent_at = now(), resend_id = $2, test_send = $3 WHERE id = $1`,
-        [eventId, (result as any).id || null, cfg.test_mode]
+        `UPDATE outreach_events SET status = 'sent', sent_at = now(), resend_id = $2, test_send = false WHERE id = $1`,
+        [eventId, (result as any).id || null]
       );
       const leadId = Number(data.leadId);
       if (leadId) {
-        const nextF = cfg.follow_up_days.length ? cfg.follow_up_days[0] : 3;
+        const fn = Number(data.followUpNumber || 0);
+        const delay = nextFollowUpDelay(cfg.follow_up_days, fn);
         await pool.query(
-          `UPDATE leads SET last_contacted_at = now(), next_follow_up = now() + ($1 || ' days')::interval WHERE id = $2`,
-          [nextF, leadId]
+          `UPDATE leads SET last_contacted_at = now(), next_follow_up = $1 WHERE id = $2`,
+          [delay != null ? new Date(Date.now() + delay * 86400000) : null, leadId]
         );
       }
       sent++;
@@ -304,13 +320,21 @@ export async function processOutreachQueue(cfg: OutreachConfig): Promise<{ sent:
       failed++;
     }
   }
-  return { sent, failed, skipped, capped };
+  return { sent, failed, skipped, capped, testMode: cfg.test_mode };
+}
+
+/** Days from NOW until the next scheduled email, after follow-up number `fn`
+ *  was sent — null when no further follow-ups remain. */
+export function nextFollowUpDelay(days: number[], fn: number): number | null {
+  if (fn < 0 || fn >= days.length) return null;
+  if (fn === 0) return days[0];
+  return Math.max(1, days[fn] - days[fn - 1]);
 }
 
 // ---------------------------------------------------------------------------
 // MANUAL CONTROLS (keep the human in charge)
 // ---------------------------------------------------------------------------
-export async function sendOutreachNow(leadId: number): Promise<{ ok: boolean; error?: string; to?: string }> {
+export async function sendOutreachNow(leadId: number): Promise<{ ok: boolean; error?: string; to?: string; testMode?: boolean }> {
   const cfg = await getOutreachConfig();
   const lead = await pool.query(`SELECT * FROM leads WHERE id = $1`, [leadId]);
   if ((lead.rowCount ?? 0) === 0) return { ok: false, error: "Lead not found." };
@@ -329,15 +353,25 @@ export async function sendOutreachNow(leadId: number): Promise<{ ok: boolean; er
   const event = ev.rows[0];
   if (event.status === "sent" || event.status === "replied") return { ok: false, error: "This lead has already received email 1." };
 
-  const to = cfg.test_mode ? cfg.test_recipient : email;
+  // TEST MODE: deliver to the test recipient only — the event stays queued so
+  // the real send to the lead still happens when test mode is switched off.
+  if (cfg.test_mode) {
+    const t = await sendEmail({ to: cfg.test_recipient, subject: event.subject, html: event.body, replyTo: DEFAULT_REPLY_TO });
+    return t.sent ? { ok: true, to: cfg.test_recipient, testMode: true } : { ok: false, error: t.error || "Send failed" };
+  }
+
+  const to = email;
   const result = await sendEmail({ to, subject: event.subject, html: event.body, replyTo: DEFAULT_REPLY_TO });
   if (result.sent) {
     await pool.query(
-      `UPDATE outreach_events SET status = 'sent', sent_at = now(), resend_id = $2, test_send = $3 WHERE id = $1`,
-      [event.id, (result as any).id || null, cfg.test_mode]
+      `UPDATE outreach_events SET status = 'sent', sent_at = now(), resend_id = $2, test_send = false WHERE id = $1`,
+      [event.id, (result as any).id || null]
     );
-    const nextF = cfg.follow_up_days.length ? cfg.follow_up_days[0] : 3;
-    await pool.query(`UPDATE leads SET last_contacted_at = now(), next_follow_up = now() + ($1 || ' days')::interval WHERE id = $2`, [nextF, leadId]);
+    const delay = nextFollowUpDelay(cfg.follow_up_days, Number(event.follow_up_number || 0));
+    await pool.query(
+      `UPDATE leads SET last_contacted_at = now(), next_follow_up = $1 WHERE id = $2`,
+      [delay != null ? new Date(Date.now() + delay * 86400000) : null, leadId]
+    );
     return { ok: true, to };
   }
   await pool.query(`UPDATE outreach_events SET status = 'failed', error_message = $2, failed_at = now() WHERE id = $1`, [event.id, String(result.error || "send failed").slice(0, 500)]);
@@ -415,7 +449,7 @@ export async function getOutreachDashboard() {
 
   const list = await pool.query(
     `SELECT e.id, e.lead_id, e.recipient_email, e.subject, e.status, e.error_message, e.follow_up_number,
-            e.queued_at, e.sent_at, e.failed_at, e.test_send,
+            e.queued_at, e.sent_at, e.failed_at, e.delivered_at, e.test_send,
             l.full_name, l.business_name, l.lead_score, l.status AS lead_status
      FROM outreach_events e
      LEFT JOIN leads l ON l.id = e.lead_id
