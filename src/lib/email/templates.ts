@@ -18,6 +18,10 @@ export const TEMPLATE_VARS: { key: string; label: string; sample: string }[] = [
   { key: "category", label: "Category", sample: "HIGH PRIORITY" },
   { key: "challenge", label: "Biggest challenge", sample: "leads come in but 70% never get a follow-up call" },
   { key: "summary", label: "AI summary", sample: "Scored 78/100 — strong fit for AI lead automation." },
+  { key: "services", label: "Recommended services", sample: "lead follow-up automation, enquiry response" },
+  { key: "automation_goals", label: "Automation goals", sample: "faster follow-ups, no missed enquiries" },
+  { key: "current_software", label: "Current software", sample: "WhatsApp + Excel" },
+  { key: "monthly_leads", label: "Monthly leads", sample: "120" },
   { key: "meetingDate", label: "Meeting date & time", sample: "2 Sep 2026, 11:00 AM" },
   { key: "meetingTime", label: "Meeting time", sample: "11:00 AM IST" },
   { key: "meetingLink", label: "Meeting link", sample: "meet.google.com/abc-defg-hij" },
@@ -97,6 +101,12 @@ export function leadToTemplateData(lead: Record<string, any>): Record<string, st
     website: (lead.businessWebsite || lead.business_website || "").replace(/^https?:\/\//, ""),
     phone: lead.phone || "",
     email: lead.email || "",
+    services: (Array.isArray(lead.recommendedServices) || Array.isArray(lead.recommended_services)
+      ? (lead.recommendedServices || lead.recommended_services).join(", ")
+      : (lead.recommendedServices || lead.recommended_services || "")),
+    automation_goals: lead.automationGoals || lead.automation_goals || "",
+    current_software: lead.currentSoftware || lead.current_software || "",
+    monthly_leads: lead.monthlyLeads || lead.monthly_leads || "",
     city: lead.city || "",
     country: lead.country || "",
     industry: prettifyIndustry(lead.industry),

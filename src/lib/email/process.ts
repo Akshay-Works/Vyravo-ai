@@ -3,8 +3,12 @@ import { pool } from "@/db";
 import { sendEmail } from "./send";
 
 export async function processEmailQueue(limit = 20): Promise<{ sent: number; failed: number }> {
+  // Outreach emails are tracked in outreach_events and processed by
+  // processOutreachQueue (daily limit, rate gap, test mode). Skip them here
+  // so they are never double-sent.
   const rows = await pool.query(
     `SELECT * FROM email_queue WHERE status = 'pending' AND scheduled_for <= now()
+       AND template_data->>'outreach_event_id' IS NULL
      ORDER BY scheduled_for LIMIT $1`,
     [limit]
   );

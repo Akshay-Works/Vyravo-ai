@@ -40,7 +40,7 @@ function getTransporter(): nodemailer.Transporter | null {
   return transporter;
 }
 
-export async function sendEmail(options: EmailOptions): Promise<{ sent: boolean; error?: string; provider: "resend" | "gmail" }> {
+export async function sendEmail(options: EmailOptions): Promise<{ sent: boolean; error?: string; provider: "resend" | "gmail"; id?: string }> {
   const resendKey = process.env.RESEND_API_KEY;
 
   // 1) Resend (primary)
@@ -64,7 +64,9 @@ export async function sendEmail(options: EmailOptions): Promise<{ sent: boolean;
         const text = await res.text().catch(() => "");
         throw new Error(`Resend error (${res.status}): ${text.slice(0, 200)}`);
       }
-      return { sent: true, provider: "resend" };
+      let id: string | undefined;
+      try { const j = await res.json(); id = j?.id; } catch { /* some providers return empty body */ }
+      return { sent: true, provider: "resend", id };
     } catch (e: any) {
       console.error("Resend failed, falling back to Gmail:", e?.message);
     }

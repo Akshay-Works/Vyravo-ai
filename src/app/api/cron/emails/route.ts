@@ -1,6 +1,8 @@
 import { NextRequest } from "next/server";
 import { timingSafeEqual } from "crypto";
 import { processEmailQueue } from "@/lib/email/process";
+import { processOutreachQueue, ensureOutreachSchema } from "@/lib/outreach/pipeline";
+import { getOutreachConfig } from "@/lib/outreach/config";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +22,19 @@ export async function GET(request: NextRequest) {
   }
   try {
     const result = await processEmailQueue(50);
-    return Response.json({ ok: true, ...result });
+    let outreach: any = { sent: 0, failed: 0, skipped: 0, capped: false, auto: false };
+    try {
+      await ensureOutreachSchema();
+      const cfg = await getOutreachConfig();
+      // AUTO OUTREACH OFF ⇒ the cron must never send outreach emails
+      // (manual "Process queue now" / "Send now" still work)
+      if (cfg.auto_outreach) {
+        outreach = { ...(await processOutreachQueue(cfg)), auto: true };
+      } else {
+        outreach.auto = false;
+      }
+    } catch (e) { console.error("Cron outreach error:", e); }
+    return Response.json({ ok: true, ...result, outreach });
   } catch (e) {
     console.error("Cron email error:", e);
     return Response.json({ error: "Failed" }, { status: 500 });
