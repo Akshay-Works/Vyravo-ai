@@ -44,7 +44,7 @@ export default function AnalyticsDashboardPage() {
     try {
       const res = await fetch(`/api/analytics?period=${period}`);
       const d = await res.json();
-      if (d.overview) setData(d);
+      if (d.overview || d.funnel2 || d.engine) setData(d);
     } catch {} finally { setLoading(false); }
   }, [period]);
 
