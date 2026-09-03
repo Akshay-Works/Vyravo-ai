@@ -34,6 +34,7 @@ type Lead = {
 const EMAIL_TYPES = [
   "campaign", "follow-up", "proposal-follow-up", "new-lead-confirmation",
   "discovery-call-confirmation", "onboarding", "project-update", "custom",
+  "outreach-intro", "outreach-followup-1", "outreach-followup-2",
 ];
 
 const scoreBadge = (s: number) =>
