@@ -28,7 +28,8 @@ export function dateClause(filter: DateFilter, column: any, defaultFrom?: string
   else if (filter.period === "year") { from = new Date(now.getFullYear(), 0, 1); }
   else { from = new Date(now.getTime() - 30 * 86400000); }
   if (filter.from) from = new Date(filter.from);
-  return and(gte(column, from.toISOString()), lte(column, to.toISOString()));
+  // pass Date objects — drizzle PgTimestamp.mapToDriverValue calls .toISOString() itself
+  return and(gte(column, from), lte(column, to));
 }
 
 // ---------------------------------------------------------------------------
@@ -59,7 +60,7 @@ export async function getDashboard(filter: DateFilter = {}) {
   let prevRevenue: any = null;
   let prevPropStats: any = null;
   try {
-    const pdc = (col: any) => and(gte(col, prev.from.toISOString()), lte(col, prev.to.toISOString()));
+    const pdc = (col: any) => and(gte(col, prev.from), lte(col, prev.to));
     [prevLeadStats, prevRevenue, prevPropStats] = await Promise.all([
       aggregateLeads(pdc),
       aggregateRevenue(pdc),
@@ -115,12 +116,12 @@ function getPreviousPeriod(filter: DateFilter): { from: Date; to: Date } {
 // ---------------------------------------------------------------------------
 async function aggregateLeads(dc: any) {
   const base = db.select({ n: count(), qual: sql`count(*) filter (where ${leads.leadCategory} is not null)` }).from(leads);
-  const rows = dc ? await base.where(dc) : await base;
+  const rows = dc ? await base.where(dc(leads.createdAt)) : await base;
   const byStage = await (dc
-    ? db.select({ stage: leads.stage, n: count() }).from(leads).where(dc).groupBy(leads.stage).orderBy(sql`count(*) desc`)
+    ? db.select({ stage: leads.stage, n: count() }).from(leads).where(dc(leads.createdAt)).groupBy(leads.stage).orderBy(sql`count(*) desc`)
     : db.select({ stage: leads.stage, n: count() }).from(leads).groupBy(leads.stage).orderBy(sql`count(*) desc`));
   const bySource = await (dc
-    ? db.select({ source: leads.source, n: count() }).from(leads).where(dc).groupBy(leads.source).orderBy(sql`count(*) desc`)
+    ? db.select({ source: leads.source, n: count() }).from(leads).where(dc(leads.createdAt)).groupBy(leads.source).orderBy(sql`count(*) desc`)
     : db.select({ source: leads.source, n: count() }).from(leads).groupBy(leads.source).orderBy(sql`count(*) desc`));
   return {
     total: Number(rows[0]?.n ?? 0),
@@ -132,20 +133,20 @@ async function aggregateLeads(dc: any) {
 
 async function aggregateLeadSources(dc: any) {
   const rows = await (dc
-    ? db.select({ source: leads.source, n: count(), qual: sql`count(*) filter (where ${leads.leadCategory} is not null)` }).from(leads).where(dc).groupBy(leads.source).orderBy(sql`count(*) desc`)
+    ? db.select({ source: leads.source, n: count(), qual: sql`count(*) filter (where ${leads.leadCategory} is not null)` }).from(leads).where(dc(leads.createdAt)).groupBy(leads.source).orderBy(sql`count(*) desc`)
     : db.select({ source: leads.source, n: count(), qual: sql`count(*) filter (where ${leads.leadCategory} is not null)` }).from(leads).groupBy(leads.source).orderBy(sql`count(*) desc`));
   return rows.map((r) => ({ source: r.source || "unknown", count: Number(r.n), qualified: Number(r.qual) }));
 }
 
 async function aggregateVoiceCalls(dc: any) {
   const base = db.select({ n: count(), answered: sql`count(*) filter (where ${voiceCalls.leadStatus} = 'qualified')` }).from(voiceCalls);
-  const rows = dc ? await base.where(dc) : await base;
+  const rows = dc ? await base.where(dc(voiceCalls.createdAt)) : await base;
   return { total: Number(rows[0]?.n ?? 0), answered: Number(rows[0]?.answered ?? 0) };
 }
 
 async function aggregateProposals(dc: any) {
   const all = dc
-    ? await db.select().from(proposals).where(dc)
+    ? await db.select().from(proposals).where(dc(proposals.createdAt))
     : await db.select().from(proposals);
   return {
     total: all.length,
@@ -164,7 +165,7 @@ async function aggregateProposals(dc: any) {
 
 async function aggregateRevenue(dc: any) {
   const allInvoices = dc
-    ? await db.select().from(invoices).where(dc)
+    ? await db.select().from(invoices).where(dc(invoices.createdAt))
     : await db.select().from(invoices);
   const total = allInvoices.reduce((s, i: any) => s + Number(i.total || 0), 0);
   const paid = allInvoices.filter((i: any) => i.status === "paid").reduce((s, i: any) => s + Number(i.total || 0), 0);
@@ -180,7 +181,7 @@ async function aggregateRevenue(dc: any) {
 
 async function aggregateRecurringRevenue(dc: any) {
   const all = dc
-    ? await db.select().from(invoices).where(dc)
+    ? await db.select().from(invoices).where(dc(invoices.createdAt))
     : await db.select().from(invoices);
   const monthly = all.filter((i: any) => Number(i.monthlyRecurring || 0) > 0)
     .reduce((s, i: any) => s + Number(i.monthlyRecurring || 0), 0);
@@ -196,7 +197,7 @@ async function aggregateClients() {
 }
 
 async function aggregateProjects(dc: any) {
-  const all = dc ? await db.select().from(projects).where(dc) : await db.select().from(projects);
+  const all = dc ? await db.select().from(projects).where(dc(projects.createdAt)) : await db.select().from(projects);
   return {
     total: all.length,
     active: all.filter((p: any) => !["completed", "cancelled"].includes(p.status || "")).length,
@@ -215,7 +216,7 @@ async function aggregateAiStats(dc: any) {
   let kb = { total: 0, unanswered: 0, gaps: 0 };
   try {
     const kbQuery = dc
-      ? db.select({ n: count() }).from(kbQueries).where(dc)
+      ? db.select({ n: count() }).from(kbQueries).where(dc(kbQueries.createdAt))
       : db.select({ n: count() }).from(kbQueries);
     const gapQuery = db.select({ n: count() }).from(kbKnowledgeGaps).where(eq(kbKnowledgeGaps.status, "open"));
     const [q, g] = await Promise.all([

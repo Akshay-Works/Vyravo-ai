@@ -11,7 +11,7 @@ const scoreColor = (s: number) =>
   : "bg-zinc-500/15 text-zinc-400 border-zinc-500/30";
 
 export default async function CrmLeadsPage() {
-  const rows = await db.select().from(leads).orderBy(desc(leads.leadScore)).limit(150);
+  const rows = await db.select().from(leads).orderBy(desc(leads.createdAt)).limit(150);
   const byStage = new Map<string, number>();
   rows.forEach((r) => byStage.set(r.stage || "new", (byStage.get(r.stage || "new") || 0) + 1));
 
@@ -20,7 +20,7 @@ export default async function CrmLeadsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-[var(--font-heading)] text-2xl font-semibold text-white">CRM — Real Leads</h1>
-          <p className="mt-1 text-sm text-grey">Every real lead (engine + website), highest score first. Never shown on public demos.</p>
+          <p className="mt-1 text-sm text-grey">Every real lead (engine + website), newest first. Never shown on public demos.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           {[...byStage.entries()].map(([stage, n]) => (
