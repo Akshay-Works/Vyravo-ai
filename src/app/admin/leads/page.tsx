@@ -4,6 +4,7 @@ import { leads } from "@/db/schema";
 import { desc } from "drizzle-orm";
 import { isAdminAuthenticated } from "@/lib/knowledge-base/auth";
 import { ensureLinkedInSchema } from "@/lib/linkedin/pipeline";
+import { ensureWhatsAppSchema } from "@/lib/whatsapp/pipeline";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,7 @@ const scoreColor = (s: number) =>
 export default async function AdminLeadsPage() {
   if (!(await isAdminAuthenticated())) redirect("/admin/login");
   await ensureLinkedInSchema();
+  await ensureWhatsAppSchema();
   const rows = await db.select().from(leads).orderBy(desc(leads.createdAt)).limit(120);
   const engine = rows.filter((r) => r.source === "lead_engine");
   const other = rows.filter((r) => r.source !== "lead_engine");
@@ -40,6 +42,7 @@ export default async function AdminLeadsPage() {
             <th className="p-3">Score</th>
             <th className="p-3">Stage</th>
             <th className="p-3">LinkedIn</th>
+            <th className="p-3">WhatsApp</th>
             <th className="p-3">Source</th>
             <th className="p-3">Added</th>
           </tr>
@@ -82,6 +85,27 @@ export default async function AdminLeadsPage() {
                   <a href={`https://${String(r.linkedinUrl).replace(/^https?:\/\//, "")}`} target="_blank" rel="noreferrer" className="block text-[10px] text-primary hover:underline mt-0.5">
                     profile ↗
                   </a>
+                )}
+              </td>
+              <td className="p-3">
+                {r.whatsappOptInStatus === "opted_out" ? (
+                  <span className="inline-block rounded-full border px-2 py-0.5 text-[10px] font-medium bg-red-500/15 text-red-400 border-red-500/30">OPTED OUT</span>
+                ) : r.whatsappOutreachStatus ? (
+                  <span className={`inline-block rounded-full border px-2 py-0.5 text-[10px] font-medium ${
+                    ["sent","delivered","read","replied"].includes(r.whatsappOutreachStatus) ? "bg-green-500/15 text-green-400 border-green-500/30"
+                    : r.whatsappOutreachStatus === "awaiting_approval" ? "bg-amber-500/15 text-amber-400 border-amber-500/30"
+                    : r.whatsappOutreachStatus === "failed" ? "bg-red-500/15 text-red-400 border-red-500/30"
+                    : r.whatsappOutreachStatus === "not_eligible" ? "bg-zinc-500/15 text-zinc-400 border-zinc-500/30"
+                    : "bg-violet-500/15 text-violet-400 border-violet-500/30"}`}>
+                    {r.whatsappOutreachStatus.replace("_", " ")}
+                  </span>
+                ) : r.whatsappOptInStatus === "opted_in" ? (
+                  <span className="inline-block rounded-full border px-2 py-0.5 text-[10px] font-medium bg-green-500/15 text-green-400 border-green-500/30">OPTED IN</span>
+                ) : (
+                  <span className="text-grey-dark">—</span>
+                )}
+                {r.whatsappNumber && (
+                  <div className="text-[10px] text-grey mt-0.5">{r.whatsappNumber.slice(0, 4)}****{r.whatsappNumber.slice(-3)}</div>
                 )}
               </td>
               <td className="p-3 text-grey">{r.source || "website"}</td>

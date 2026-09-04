@@ -53,6 +53,22 @@ export const leads = pgTable("leads", {
   nextFollowUp: timestamp("next_follow_up"),
   lastContactedAt: timestamp("last_contacted_at"),
 
+  // WhatsApp Outreach (mirrored from outreach_activities via the pipeline)
+  whatsappNumber: text("whatsapp_number"),
+  whatsappCountryCode: text("whatsapp_country_code"),
+  whatsappOptInStatus: text("whatsapp_opt_in_status"),
+  whatsappOutreachStatus: text("whatsapp_outreach_status"),
+  whatsappMessage: text("whatsapp_message"),
+  whatsappMessageId: text("whatsapp_message_id"),
+  whatsappSentAt: timestamp("whatsapp_sent_at"),
+  whatsappDeliveredAt: timestamp("whatsapp_delivered_at"),
+  whatsappReadAt: timestamp("whatsapp_read_at"),
+  whatsappRepliedAt: timestamp("whatsapp_replied_at"),
+  whatsappFollowUpDate: timestamp("whatsapp_follow_up_date"),
+  whatsappLastActivity: timestamp("whatsapp_last_activity"),
+  whatsappError: text("whatsapp_error"),
+  whatsappOptOutAt: timestamp("whatsapp_opt_out_at"),
+
   // LinkedIn Outreach (mirrored from outreach_activities via the pipeline)
   linkedinUrl: text("linkedin_url"),
   linkedinStatus: text("linkedin_status"),
