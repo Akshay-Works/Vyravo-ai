@@ -1,7 +1,10 @@
 import { NextRequest } from "next/server";
 import { db } from "@/db";
 import { leads, activities } from "@/db/schema";
-import { eq, ilike, and } from "drizzle-orm";
+import { eq, ilike, and, isNull } from "drizzle-orm";
+
+// only genuine LinkedIn profile/company URLs are accepted on ingest
+const LI_RE = /^(https?:\/\/)?(([\w-]+\.)?linkedin\.com)\/(in|company|pub)\/[A-Za-z0-9\-_%]+/i;
 
 export const dynamic = "force-dynamic";
 
@@ -14,22 +17,36 @@ export async function POST(request: NextRequest) {
   }
   const body = await request.json().catch(() => ({}));
   if (!body.fullName) return Response.json({ success: false, error: "fullName required" }, { status: 400 });
+  const linkedinUrl = typeof body.linkedinUrl === "string" && LI_RE.test(body.linkedinUrl.trim())
+    ? body.linkedinUrl.trim()
+    : null;
+
+  // back-fill: if the lead already exists but has no LinkedIn URL, store it now
+  // (so LinkedIn outreach has a recipient for previously-pushed leads too)
+  const maybeUpdate = async (leadId: number) => {
+    if (linkedinUrl) {
+      await db.update(leads).set({ linkedinUrl: linkedinUrl, updatedAt: new Date() }).where(
+        and(eq(leads.id, leadId), isNull(leads.linkedinUrl))
+      );
+    }
+    return leadId;
+  };
 
   if (body.email) {
     const dup = await db.select({ id: leads.id }).from(leads)
       .where(ilike(leads.email, String(body.email).toLowerCase())).limit(1);
-    if (dup.length) return Response.json({ success: true, lead: dup[0], created: false });
+    if (dup.length) { await maybeUpdate(dup[0].id); return Response.json({ success: true, lead: dup[0], created: false }); }
   }
   if (body.phone) {
     const conds = [eq(leads.phone, String(body.phone))];
     if (body.businessName) conds.push(ilike(leads.businessName, String(body.businessName)));
     const dup = await db.select({ id: leads.id }).from(leads).where(and(...conds)).limit(1);
-    if (dup.length) return Response.json({ success: true, lead: dup[0], created: false });
+    if (dup.length) { await maybeUpdate(dup[0].id); return Response.json({ success: true, lead: dup[0], created: false }); }
   }
   if (body.businessWebsite) {
     const dup = await db.select({ id: leads.id }).from(leads)
       .where(eq(leads.businessWebsite, String(body.businessWebsite))).limit(1);
-    if (dup.length) return Response.json({ success: true, lead: dup[0], created: false });
+    if (dup.length) { await maybeUpdate(dup[0].id); return Response.json({ success: true, lead: dup[0], created: false }); }
   }
 
   const [newLead] = await db.insert(leads).values({
@@ -38,6 +55,7 @@ export async function POST(request: NextRequest) {
     phone: body.phone || null,
     businessName: body.businessName || null,
     businessWebsite: body.businessWebsite || null,
+    linkedinUrl: linkedinUrl,
     industry: body.industry || null,
     country: body.country || "India",
     biggestChallenge: body.biggestChallenge || null,

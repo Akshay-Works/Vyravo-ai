@@ -52,6 +52,17 @@ export const leads = pgTable("leads", {
   // Follow-up
   nextFollowUp: timestamp("next_follow_up"),
   lastContactedAt: timestamp("last_contacted_at"),
+
+  // LinkedIn Outreach (mirrored from outreach_activities via the pipeline)
+  linkedinUrl: text("linkedin_url"),
+  linkedinStatus: text("linkedin_status"),
+  linkedinMessage: text("linkedin_message"),
+  linkedinSentAt: timestamp("linkedin_sent_at"),
+  linkedinFollowUpDate: timestamp("linkedin_follow_up_date"),
+  linkedinConnectionStatus: text("linkedin_connection_status"),
+  linkedinLastActivity: timestamp("linkedin_last_activity"),
+  linkedinPersonalization: jsonb("linkedin_personalization"),
+  linkedinError: text("linkedin_error"),
   
   // Conversion
   convertedToClientId: integer("converted_to_client_id"),

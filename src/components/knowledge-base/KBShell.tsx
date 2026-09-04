@@ -13,6 +13,7 @@ const NAV_ITEMS = [
   { href: "/admin/email-automation", label: "Email Automation", icon: "✉️" },
   { href: "/admin/email-templates", label: "Email Templates", icon: "📨" },
   { href: "/admin/outreach", label: "Outreach", icon: "🤝" },
+  { href: "/admin/linkedin-outreach", label: "LinkedIn Outreach", icon: "💼" },
   { href: "/admin/workflows", label: "Workflows", icon: "⚡" },
   { href: "/admin/portal/clients", label: "Portal Clients", icon: "👥" },
   { href: "/admin/proposals", label: "Proposals", icon: "📄" },

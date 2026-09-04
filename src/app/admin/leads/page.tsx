@@ -3,8 +3,18 @@ import { db } from "@/db";
 import { leads } from "@/db/schema";
 import { desc } from "drizzle-orm";
 import { isAdminAuthenticated } from "@/lib/knowledge-base/auth";
+import { ensureLinkedInSchema } from "@/lib/linkedin/pipeline";
 
 export const dynamic = "force-dynamic";
+
+const liStatusColor = (s: string | null) =>
+  s === "sent" || s === "replied" ? "bg-green-500/15 text-green-400 border-green-500/30"
+  : s === "awaiting_approval" ? "bg-amber-500/15 text-amber-400 border-amber-500/30"
+  : s === "queued" || s === "approved" ? "bg-sky-500/15 text-sky-400 border-sky-500/30"
+  : s === "failed" ? "bg-red-500/15 text-red-400 border-red-500/30"
+  : s === "not_eligible" ? "bg-zinc-500/15 text-zinc-400 border-zinc-500/30"
+  : s ? "bg-violet-500/15 text-violet-400 border-violet-500/30"
+  : "bg-zinc-500/15 text-zinc-400 border-zinc-500/30";
 
 const scoreColor = (s: number) =>
   s >= 90 ? "bg-green-500/15 text-green-400 border-green-500/30"
@@ -14,6 +24,7 @@ const scoreColor = (s: number) =>
 
 export default async function AdminLeadsPage() {
   if (!(await isAdminAuthenticated())) redirect("/admin/login");
+  await ensureLinkedInSchema();
   const rows = await db.select().from(leads).orderBy(desc(leads.createdAt)).limit(120);
   const engine = rows.filter((r) => r.source === "lead_engine");
   const other = rows.filter((r) => r.source !== "lead_engine");
@@ -28,6 +39,7 @@ export default async function AdminLeadsPage() {
             <th className="p-3">Industry</th>
             <th className="p-3">Score</th>
             <th className="p-3">Stage</th>
+            <th className="p-3">LinkedIn</th>
             <th className="p-3">Source</th>
             <th className="p-3">Added</th>
           </tr>
@@ -58,6 +70,20 @@ export default async function AdminLeadsPage() {
                 {r.leadCategory && <div className="mt-1 text-xs text-grey-dark">{r.leadCategory}</div>}
               </td>
               <td className="p-3 text-grey">{r.stage || "new"}</td>
+              <td className="p-3">
+                {r.linkedinStatus ? (
+                  <span className={`inline-block rounded-full border px-2 py-0.5 text-[10px] font-medium ${liStatusColor(r.linkedinStatus)}`}>
+                    {r.linkedinStatus.replace("_", " ")}
+                  </span>
+                ) : (
+                  <span className="text-grey-dark">—</span>
+                )}
+                {r.linkedinUrl && (
+                  <a href={`https://${String(r.linkedinUrl).replace(/^https?:\/\//, "")}`} target="_blank" rel="noreferrer" className="block text-[10px] text-primary hover:underline mt-0.5">
+                    profile ↗
+                  </a>
+                )}
+              </td>
               <td className="p-3 text-grey">{r.source || "website"}</td>
               <td className="p-3 text-grey-dark">{r.createdAt ? new Date(r.createdAt).toLocaleDateString("en-IN") : "—"}</td>
             </tr>
