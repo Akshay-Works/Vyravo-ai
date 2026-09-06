@@ -205,7 +205,7 @@ export async function upsertForeignLead(l: ForeignLeadIn): Promise<{ action: "cr
     [
       l.decision_maker_name || l.company_name, email, l.phone, l.company_name, website, l.industry, l.company_size, l.country_name || l.country_code || "Unknown",
       l.city, firstName, lastName, l.job_title, l.linkedin_url,
-      l.score ?? 0, l.bucket ?? null, l.lead_type, l.recommended_offer ? [l.recommended_offer] : null, l.why_this_lead,
+      l.score ?? 0, l.bucket ?? null, l.lead_type, l.recommended_offer ? JSON.stringify([l.recommended_offer]) : null, l.why_this_lead,
       l.stage || "NEW", l.source, JSON.stringify(l.agency_services || []),
       l.email_status || "UNKNOWN", l.email_source || null, l.email_verified_at || null,
       l.why_this_lead, l.recommended_offer, JSON.stringify(l.outreach_drafts || null), JSON.stringify(l.score_reasons || null),
