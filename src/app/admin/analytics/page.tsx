@@ -125,6 +125,7 @@ export default function AnalyticsDashboardPage() {
               </div>
               <div className="flex gap-2">
                 <Link href="/admin/funnel2" className="text-xs px-3 py-1.5 rounded-lg border border-primary/40 text-primary hover:bg-primary/10">Funnel 2 admin →</Link>
+                <Link href="/admin/foreign-engine" className="text-xs px-3 py-1.5 rounded-lg border border-primary/40 text-primary hover:bg-primary/10">🌍 Foreign engine →</Link>
                 <Link href="/admin/leads" className="text-xs px-3 py-1.5 rounded-lg border border-primary/40 text-primary hover:bg-primary/10">Engine leads →</Link>
               </div>
             </div>
