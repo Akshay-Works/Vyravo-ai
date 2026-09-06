@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { runOutreachPipeline } from "@/lib/outreach/pipeline";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60; // Vercel Hobby limit; batch cap keeps us well inside
 
 // POST /api/outreach/pipeline?send=1 — called by the lead-engine workflow
 // right after it pushes new leads to the CRM (same ADMIN_API_URL +

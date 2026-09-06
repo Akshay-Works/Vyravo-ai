@@ -238,7 +238,7 @@ export async function scheduleFollowUps(cfg: OutreachConfig): Promise<number> {
 // ---------------------------------------------------------------------------
 // SEND — controlled, rate-limited, limit-capped, test-mode aware
 // ---------------------------------------------------------------------------
-export async function processOutreachQueue(cfg: OutreachConfig): Promise<{ sent: number; failed: number; skipped: number; capped: boolean; testMode: boolean }> {
+export async function processOutreachQueue(cfg: OutreachConfig): Promise<{ sent: number; failed: number; skipped: number; capped: boolean; truncated: boolean; batchCap: number; testMode: boolean }> {
   await ensureOutreachSchema();
   const rows = await pool.query(
     `SELECT q.* FROM email_queue q
@@ -254,13 +254,22 @@ export async function processOutreachQueue(cfg: OutreachConfig): Promise<{ sent:
     sentToday = c.rows[0]?.n || 0;
   }
   const remaining = cfg.test_mode ? rows.rows.length : Math.max(0, cfg.daily_limit - sentToday);
-  const batch = (rows.rows as any[]).slice(0, remaining);
+  // ---- serverless safety: ALWAYS finish inside the function window ----
+  // Vercel Hobby kills functions at 60s (default even sooner). A full queue
+  // at 20s gaps would exceed that, so each invocation only takes a bounded
+  // slice; the queue is stateful (pending -> sent/failed), so the next tick
+  // (cron 02:00 + 3 engine hooks/day, or manual Run now) simply continues.
+  const BATCH_CAP = Math.max(1, Number.parseInt(process.env.OUTREACH_MAX_BATCH || "8", 10) || 8);
+  const TIME_BUDGET_MS = 45_000;
+  const loopStart = Date.now();
+  const batch = (rows.rows as any[]).slice(0, Math.min(remaining, BATCH_CAP));
   const capped = rows.rows.length > batch.length;
 
-  let sent = 0, failed = 0, skipped = 0;
+  let sent = 0, failed = 0, skipped = 0, truncated = false;
   let lastSendAt = 0;
   const gap = cfg.min_gap_secs * 1000;
   for (const row of batch) {
+    if (Date.now() - loopStart > TIME_BUDGET_MS) { truncated = true; break; }
     const data = row.template_data || {};
     const eventId = Number(data.outreach_event_id);
 
@@ -320,7 +329,7 @@ export async function processOutreachQueue(cfg: OutreachConfig): Promise<{ sent:
       failed++;
     }
   }
-  return { sent, failed, skipped, capped, testMode: cfg.test_mode };
+  return { sent, failed, skipped, capped, truncated, batchCap: BATCH_CAP, testMode: cfg.test_mode };
 }
 
 /** Days from NOW until the next scheduled email, after follow-up number `fn`

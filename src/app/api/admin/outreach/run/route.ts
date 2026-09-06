@@ -3,6 +3,7 @@ import { isAdminAuthenticated } from "@/lib/knowledge-base/auth";
 import { runOutreachPipeline } from "@/lib/outreach/pipeline";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60; // Vercel Hobby limit; batch cap keeps us well inside
 
 // POST /api/admin/outreach/run?send=1 — manual "run pipeline now".
 // Generates + queues emails for new leads always; sends only when AUTO

@@ -5,6 +5,7 @@ import { processOutreachQueue, ensureOutreachSchema } from "@/lib/outreach/pipel
 import { getOutreachConfig } from "@/lib/outreach/config";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60; // Vercel Hobby limit; batch cap keeps us well inside
 
 // GET /api/cron/emails — Vercel Cron trigger for the real email worker.
 // If CRON_SECRET is set, Vercel sends it as `Authorization: Bearer ...` and we verify it.
