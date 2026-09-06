@@ -5,6 +5,7 @@
 // ============================================================================
 import { pool } from "@/db";
 import { renderTemplate, leadToTemplateData } from "@/lib/email/templates";
+import { renderOutreachHtml } from "./premium";
 import { sendEmail, DEFAULT_REPLY_TO } from "@/lib/email/send";
 import { getOutreachConfig, type OutreachConfig } from "./config";
 
@@ -48,34 +49,30 @@ const OUTREACH_TEMPLATES: { type: string; name: string; subject: string; body: s
   {
     type: "outreach-intro",
     name: "Outreach — Intro (automated)",
-    subject: "A quick idea for {{company}}",
+    subject: "An idea for {{company}}",
     body:
-      "<p>Hi {{firstName}},</p>" +
-      "<p>I came across <strong>{{company}}</strong> while mapping {{industry}} businesses that are losing time to manual work.</p>" +
-      "<p>One thing stood out: {{challenge}}</p>" +
-      "<p>At Vyravo AI we build {{services}} for businesses like yours — real workflow automation, not another AI toy.</p>" +
-      "<p>Would a short 15-minute call this week work for you? If a call is too much, just reply with \"more info\" and I'll send a quick note.</p>" +
-      "<p>Warm regards,<br/>Akshay Navale<br/>Founder, Vyravo AI</p>",
+      "<p style=\"margin:0 0 16px;\">{{greeting}}</p>" +
+      "<p style=\"margin:0 0 16px;\">I came across <strong>{{company}}</strong>{{cityCountry}} while looking at {{industry_phrase}} — {{provable}}</p>" +
+      "<p style=\"margin:0 0 16px;\">At Vyravo AI we implement {{services}} — live and working for your team, not a demo. The outcome is simple: every enquiry gets an answer the moment it arrives, follow-ups happen on their own, and nothing slips through the cracks.</p>" +
+      "<p style=\"margin:0 0 24px;\">Open to a 15-minute call this week? If a call is too much, just reply &ldquo;more info&rdquo; and I&rsquo;ll send 2&ndash;3 examples from similar {{industry}} businesses.</p>",
   },
   {
     type: "outreach-followup-1",
     name: "Outreach — Follow-up 1 (automated)",
-    subject: "Re: A quick idea for {{company}}",
+    subject: "Re: An idea for {{company}}",
     body:
-      "<p>Hi {{firstName}},</p>" +
-      "<p>Just following up on my note about {{company}}. Automated follow-ups, {{challenge}} — those are the two things we fix most often.</p>" +
-      "<p>Happy to share 2–3 concrete examples from similar {{industry}} businesses. Worth a quick call?</p>" +
-      "<p>Warm regards,<br/>Akshay Navale<br/>Founder, Vyravo AI</p>",
+      "<p style=\"margin:0 0 16px;\">{{greeting}}</p>" +
+      "<p style=\"margin:0 0 16px;\">A brief follow-up on my note. {{provable}} It's the single gap our {{industry}} clients ask us to close first.</p>" +
+      "<p style=\"margin:0 0 24px;\">If it's still on your mind, a 15-minute call works. Otherwise, reply &ldquo;more info&rdquo; and I'll keep it to a short email.</p>",
   },
   {
     type: "outreach-followup-2",
     name: "Outreach — Follow-up 2 (automated)",
-    subject: "Last follow-up — {{company}}",
+    subject: "{{company}} — last note",
     body:
-      "<p>Hi {{firstName}},</p>" +
-      "<p>Last one from me. If {{challenge}} is on your list for this quarter, my door is open — {{company}} would be a genuinely good fit for {{services}}.</p>" +
-      "<p>Either way, wishing you and the {{company}} team a great quarter.</p>" +
-      "<p>Warm regards,<br/>Akshay Navale<br/>Founder, Vyravo AI</p>",
+      "<p style=\"margin:0 0 16px;\">{{greeting}}</p>" +
+      "<p style=\"margin:0 0 16px;\">Last note from me, I promise. If {{challenge}} is on your list this quarter, I'd genuinely enjoy showing you what we do — {{services}}.</p>" +
+      "<p style=\"margin:0 0 24px;\">Either way, I'll leave you with one thought — {{provable}}</p>",
   },
 ];
 
@@ -102,7 +99,44 @@ async function templateFor(followUpNumber: number): Promise<{ subject: string; b
 }
 
 /** Render the exact email for a lead + follow-up number. Never fabricates. */
-export async function buildOutreachEmail(lead: any, followUpNumber = 0): Promise<{ subject: string; html: string; data: Record<string, string> }> {
+function greetingFor(lead: any): string {
+  // A real person wins; a company name only when it plausibly is a person
+  // (2+ words, no business-suffix keywords). Otherwise a clean "Hello,".
+  const dm = lead.decision_maker_name || lead.first_name || null;
+  if (dm) return `Hi ${String(dm).trim().split(/\s+/)[0]},`;
+  const full = String(lead.full_name || lead.fullName || lead.business_name || lead.businessName || "").trim();
+  if (!full) return "Hello,";
+  const words = full.split(/\s+/);
+  const businessy = /(ltd|limited|llc|llp|inc|corp|corporation|co\.?|company|group|gmbh|pty|plc|sa|sarl|bv|clinic|dental|hospital|studio|agency|enterprise|services|solutions|and|&)\b/i.test(full);
+  const name = words.length >= 2 && !businessy ? words[0] : null;
+  return name ? `Hi ${name},` : "Hello,";
+}
+
+/** Evidence-based one-liner. NEVER a claim not present in lead data;
+ *  when nothing is known we ask a question instead of asserting. */
+function provableLine(lead: any): string {
+  // Observation-based facts ONLY (site signals, website reachability). Internal
+  // scoring language (why_this_lead / qualification_summary) is CRM-internal
+  // and never shown to the lead. No facts → an honest question, never a claim.
+  const clean = (s: unknown) => String(s || "").trim().replace(/[.\s]+$/, "");
+  const industry = clean(lead.industry);
+  const signals = lead.signals && typeof lead.signals === "object" ? lead.signals : null;
+  try {
+    if (signals && signals.has_chatbot === false) {
+      return `I noticed your site has no live chat or instant-reply path, so after-hours enquiries can sit until morning${industry ? ` — a real gap for ${industry}` : ""}.`;
+    }
+    if (lead.website_ok === false) {
+      return `your public listing does not link a working website, so a share of enquiries may never arrive.`;
+    }
+    if (signals && signals.has_lead_form === true && signals.has_chatbot === false) {
+      return `your site already collects enquiries — the question is whether every one of them gets a fast answer.`;
+    }
+  } catch { /* fall through */ }
+  return "I'd love to learn where manual work slows your team down most.";
+}
+
+/** Render the exact email for a lead + follow-up number. Never fabricates. */
+export async function buildOutreachEmail(lead: any, followUpNumber = 0): Promise<{ subject: string; html: string; text: string; data: Record<string, string> }> {
   const tpl = await templateFor(followUpNumber);
   const data = leadToTemplateData(lead);
   // richer per-lead personalization (still real lead data only)
@@ -113,13 +147,71 @@ export async function buildOutreachEmail(lead: any, followUpNumber = 0): Promise
   data.automation_goals = lead.automation_goals || "";
   data.current_software = lead.current_software || "";
   data.monthly_leads = lead.monthly_leads || "";
-  // fallbacks that never claim facts: a question instead of an assertion when no challenge is on file
   if (!data.challenge) data.challenge = "I'd love to learn where manual work slows your team down most";
-  return {
-    subject: renderTemplate(tpl.subject, data),
-    html: renderTemplate(tpl.body, data, { html: true }),
-    data,
-  };
+  // ---- premium personalization (computed from real lead data only) ----
+  data.firstName = greetingFor(lead).replace(/^Hi\s*/, "").replace(/,$/, "");
+  data.greeting = greetingFor(lead);
+  const ind = (data.industry || "").trim();
+  data.industry_phrase = ind ? `similar ${ind} businesses` : "businesses like yours";
+  const city = String(data.city || "").trim();
+  const country = String(data.country || "").trim();
+  const cityCountry = city && country && city.toLowerCase() !== country.toLowerCase()
+    ? `${city}, ${country}` : (city || country);
+  data.cityCountry = cityCountry ? ` in ${cityCountry}` : "";
+  data.provable = provableLine(lead);
+  const preheader = (data.provable + " " + String(data.services || "")).replace(/<[^>]+>/g, "").slice(0, 110);
+  const subject = renderTemplate(tpl.subject, data);
+  const inner = renderTemplate(tpl.body, data, { html: true });
+  const html = renderOutreachHtml({ subject, preheader: preheader || data.company || "", innerHtml: inner, industry: ind || null });
+  const text = inner.replace(/<[^>]+>/g, " ").replace(/&[a-zA-Z]+;/g, " ").replace(/\s+/g, " ").trim();
+  return { subject, html, text, data };
+}
+
+// ---------------------------------------------------------------------------
+// REFRESH — re-render ALL pending outreach emails with the current template
+// + premium shell. Template edits (admin) or lead enrichment apply to emails
+// that have not been sent yet. Idempotent: pending rows only.
+// ---------------------------------------------------------------------------
+export async function refreshPendingOutreachEmails(): Promise<{ refreshed: number }> {
+  const rows = await pool.query(
+    `SELECT q.id AS qid, q.lead_id, q.template_data, q.status
+     FROM email_queue q
+     WHERE q.status = 'pending' AND q.email_type = 'outreach'
+       AND q.template_data->>'outreach_event_id' IS NOT NULL`
+  );
+  // template stamps: skip rows already rendered from the CURRENT template revision
+  const tplRes = await pool.query(
+    `SELECT email_type, updated_at FROM email_templates WHERE email_type IN ('outreach-intro','outreach-followup-1','outreach-followup-2')`
+  );
+  const stampByType: Record<string, string> = {};
+  for (const t of tplRes.rows) stampByType[t.email_type] = new Date(t.updated_at).getTime() + "|premium2";
+  let refreshed = 0;
+  for (const row of rows.rows) {
+    const td = row.template_data || {};
+    const fn = Number(td.followUpNumber || 0);
+    const type = fn === 0 ? "outreach-intro" : fn === 1 ? "outreach-followup-1" : "outreach-followup-2";
+    const stamp = stampByType[type];
+    if (stamp && td.tpl_stamp === stamp && String(td.html || "").startsWith("<!doctype html>")) continue;
+    const leadId = Number(row.lead_id);
+    if (!leadId) continue;
+    const leadRes = await pool.query(`SELECT * FROM leads WHERE id = $1`, [leadId]);
+    if ((leadRes.rowCount ?? 0) === 0) continue;
+    const lead = leadRes.rows[0];
+    const built = await buildOutreachEmail(lead, fn);
+    const eventId = Number(td.outreach_event_id);
+    if (eventId) {
+      await pool.query(
+        `UPDATE outreach_events SET subject = $2, body = $3 WHERE id = $1 AND status = 'queued'`,
+        [eventId, built.subject, built.html]
+      );
+    }
+    await pool.query(
+      `UPDATE email_queue SET template_data = template_data || $2::jsonb WHERE id = $1 AND status = 'pending'`,
+      [row.qid, JSON.stringify({ subject: built.subject, html: built.html, text: built.text, tpl_stamp: stamp || null })]
+    );
+    refreshed++;
+  }
+  return { refreshed };
 }
 
 // ---------------------------------------------------------------------------
@@ -476,6 +568,7 @@ export async function runOutreachPipeline(opts: { send?: boolean } = {}): Promis
   await ensureOutreachSchema();
   await ensureOutreachTemplates();
 
+  const refreshed = await refreshPendingOutreachEmails(); // apply template edits + premium shell to pending
   const gen = await generateAndQueue(cfg);
   const followups = await scheduleFollowUps(cfg);
 
@@ -486,6 +579,7 @@ export async function runOutreachPipeline(opts: { send?: boolean } = {}): Promis
   }
   return {
     cfg: { auto: cfg.auto_outreach, test: cfg.test_mode, dailyLimit: cfg.daily_limit },
+    pendingRefreshed: refreshed.refreshed,
     newQueued: gen.queued, skipped: gen.skipped, followupsScheduled: followups, sendResult,
   };
 }

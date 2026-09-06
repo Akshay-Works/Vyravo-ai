@@ -26,6 +26,10 @@ export const TEMPLATE_VARS: { key: string; label: string; sample: string }[] = [
   { key: "meetingTime", label: "Meeting time", sample: "11:00 AM IST" },
   { key: "meetingLink", label: "Meeting link", sample: "meet.google.com/abc-defg-hij" },
   { key: "date", label: "Today's date", sample: "31 Aug 2026" },
+  { key: "greeting", label: "Greeting (“Hi Rahul,” / “Hello,”)", sample: "Hi Rahul," },
+  { key: "provable", label: "Proof line (evidence-based)", sample: "your site has no live chat, so after-hours enquiries can sit until morning." },
+  { key: "cityCountry", label: "Location (“ in Singapore”)", sample: " in Singapore" },
+  { key: "industry_phrase", label: "Industry phrase", sample: "similar real estate businesses" },
   { key: "year", label: "Year", sample: "2026" },
 ];
 
