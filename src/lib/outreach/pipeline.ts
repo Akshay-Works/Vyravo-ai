@@ -6,6 +6,7 @@
 import { pool } from "@/db";
 import { renderTemplate, leadToTemplateData } from "@/lib/email/templates";
 import { renderOutreachHtml } from "./premium";
+import { resolvePoint1, resolvePoint2 } from "./personalize";
 import { sendEmail, DEFAULT_REPLY_TO } from "@/lib/email/send";
 import { getOutreachConfig, type OutreachConfig } from "./config";
 
@@ -52,7 +53,8 @@ const OUTREACH_TEMPLATES: { type: string; name: string; subject: string; body: s
     subject: "An idea for {{company}}",
     body:
       "<p style=\"margin:0 0 16px;\">{{greeting}}</p>" +
-      "<p style=\"margin:0 0 16px;\">I came across <strong>{{company}}</strong>{{cityCountry}} while looking at {{industry_phrase}} — {{provable}}</p>" +
+      "<p style=\"margin:0 0 16px;\">I came across <strong>{{company}}</strong>{{cityCountry}} while looking at {{industry_phrase}}. One thing in particular caught my eye: {{point1_lc}}</p>" +
+      "<p style=\"margin:0 0 16px;\">{{point2}}</p>" +
       "<p style=\"margin:0 0 16px;\">At Vyravo AI we implement {{services}} — live and working for your team, not a demo. The outcome is simple: every enquiry gets an answer the moment it arrives, follow-ups happen on their own, and nothing slips through the cracks.</p>" +
       "<p style=\"margin:0 0 24px;\">Open to a 15-minute call this week? If a call is too much, just reply &ldquo;more info&rdquo; and I&rsquo;ll send 2&ndash;3 examples from similar {{industry}} businesses.</p>",
   },
@@ -62,7 +64,8 @@ const OUTREACH_TEMPLATES: { type: string; name: string; subject: string; body: s
     subject: "Re: An idea for {{company}}",
     body:
       "<p style=\"margin:0 0 16px;\">{{greeting}}</p>" +
-      "<p style=\"margin:0 0 16px;\">A brief follow-up on my note. {{provable}} It's the single gap our {{industry}} clients ask us to close first.</p>" +
+      "<p style=\"margin:0 0 16px;\">A brief follow-up on my note. {{point1}} It's the single gap our {{industry}} clients ask us to close first.</p>" +
+      "<p style=\"margin:0 0 16px;\">{{point2}}</p>" +
       "<p style=\"margin:0 0 24px;\">If it's still on your mind, a 15-minute call works. Otherwise, reply &ldquo;more info&rdquo; and I'll keep it to a short email.</p>",
   },
   {
@@ -71,8 +74,9 @@ const OUTREACH_TEMPLATES: { type: string; name: string; subject: string; body: s
     subject: "{{company}} — last note",
     body:
       "<p style=\"margin:0 0 16px;\">{{greeting}}</p>" +
-      "<p style=\"margin:0 0 16px;\">Last note from me, I promise. If {{challenge}} is on your list this quarter, I'd genuinely enjoy showing you what we do — {{services}}.</p>" +
-      "<p style=\"margin:0 0 24px;\">Either way, I'll leave you with one thought — {{provable}}</p>",
+      "<p style=\"margin:0 0 16px;\">Last note from me, I promise. If the gap I mentioned is on your list this quarter, I'd genuinely enjoy showing you what we do — {{services}}.</p>" +
+      "<p style=\"margin:0 0 16px;\">{{point2}}</p>" +
+      "<p style=\"margin:0 0 24px;\">Either way, I'll leave you with one thought — {{point1}}</p>",
   },
 ];
 
@@ -100,39 +104,27 @@ async function templateFor(followUpNumber: number): Promise<{ subject: string; b
 
 /** Render the exact email for a lead + follow-up number. Never fabricates. */
 function greetingFor(lead: any): string {
-  // A real person wins; a company name only when it plausibly is a person
-  // (2+ words, no business-suffix keywords). Otherwise a clean "Hello,".
+  // A real (verified) person wins; a company name is ONLY used when it clearly
+  // looks like a human name (2-4 alphabetic words, no business keywords, no
+  // digits, no "&"). Anything else gets a clean "Hello," — never "Hi 0,".
   const dm = lead.decision_maker_name || lead.first_name || null;
-  if (dm) return `Hi ${String(dm).trim().split(/\s+/)[0]},`;
+  const firstName = dm ? String(dm).trim().split(/\s+/)[0] : null;
+  if (firstName && /^[A-Za-z][A-Za-z.'-]{1,20}$/.test(firstName)) return `Hi ${firstName},`;
   const full = String(lead.full_name || lead.fullName || lead.business_name || lead.businessName || "").trim();
   if (!full) return "Hello,";
   const words = full.split(/\s+/);
-  const businessy = /(ltd|limited|llc|llp|inc|corp|corporation|co\.?|company|group|gmbh|pty|plc|sa|sarl|bv|clinic|dental|hospital|studio|agency|enterprise|services|solutions|and|&)\b/i.test(full);
-  const name = words.length >= 2 && !businessy ? words[0] : null;
-  return name ? `Hi ${name},` : "Hello,";
+  const looksLikePerson = words.length >= 2 && words.length <= 4
+    && !full.includes("&")
+    && !/\d/.test(full)
+    && words.every((w) => /^[A-Za-z][A-Za-z.'-]*$/.test(w))
+    && !/\b(ltd|limited|llc|llp|inc|corp|corporation|co\.?|company|group|gmbh|pty|plc|sa|sarl|bv|clinic|dental|hospital|studio|agency|enterprise|services|solutions|care|center|centre)\b/i.test(full);
+  return looksLikePerson ? `Hi ${words[0]},` : "Hello,";
 }
 
 /** Evidence-based one-liner. NEVER a claim not present in lead data;
  *  when nothing is known we ask a question instead of asserting. */
 function provableLine(lead: any): string {
-  // Observation-based facts ONLY (site signals, website reachability). Internal
-  // scoring language (why_this_lead / qualification_summary) is CRM-internal
-  // and never shown to the lead. No facts → an honest question, never a claim.
-  const clean = (s: unknown) => String(s || "").trim().replace(/[.\s]+$/, "");
-  const industry = clean(lead.industry);
-  const signals = lead.signals && typeof lead.signals === "object" ? lead.signals : null;
-  try {
-    if (signals && signals.has_chatbot === false) {
-      return `I noticed your site has no live chat or instant-reply path, so after-hours enquiries can sit until morning${industry ? ` — a real gap for ${industry}` : ""}.`;
-    }
-    if (lead.website_ok === false) {
-      return `your public listing does not link a working website, so a share of enquiries may never arrive.`;
-    }
-    if (signals && signals.has_lead_form === true && signals.has_chatbot === false) {
-      return `your site already collects enquiries — the question is whether every one of them gets a fast answer.`;
-    }
-  } catch { /* fall through */ }
-  return "I'd love to learn where manual work slows your team down most.";
+  return resolvePoint1(lead);
 }
 
 /** Render the exact email for a lead + follow-up number. Never fabricates. */
@@ -155,13 +147,23 @@ export async function buildOutreachEmail(lead: any, followUpNumber = 0): Promise
   data.industry_phrase = ind ? `similar ${ind} businesses` : "businesses like yours";
   const city = String(data.city || "").trim();
   const country = String(data.country || "").trim();
-  const cityCountry = city && country && city.toLowerCase() !== country.toLowerCase()
-    ? `${city}, ${country}` : (city || country);
+  const cityCountry = city
+    ? (country && city.toLowerCase() !== country.toLowerCase() ? `${city}, ${country}` : city)
+    : "";
   data.cityCountry = cityCountry ? ` in ${cityCountry}` : "";
-  data.provable = provableLine(lead);
-  const preheader = (data.provable + " " + String(data.services || "")).replace(/<[^>]+>/g, "").slice(0, 110);
+  // ---- PER-LEAD PERSONAL POINTS (real data only; see ./personalize) ----
+  data.point1 = resolvePoint1(lead);   // the lead's own biggest challenge (or honest question)
+  data.point2 = resolvePoint2(lead);   // website observation ("" → paragraph auto-dropped)
+  // lowercase-first variant for "caught my eye: …" contexts (keeps I/It/We/The… capital)
+  data.point1_lc = /^(I|I'?m|I'?d|We|It|This|The|A|Many|Most|Our)\b/i.test(data.point1)
+    ? data.point1
+    : data.point1.charAt(0).toLowerCase() + data.point1.slice(1);
+  data.provable = data.point1;         // legacy template variable
+  const preheader = (data.point1 + " " + String(data.services || "")).replace(/<[^>]+>/g, "").slice(0, 110);
   const subject = renderTemplate(tpl.subject, data);
-  const inner = renderTemplate(tpl.body, data, { html: true });
+  let inner = renderTemplate(tpl.body, data, { html: true });
+  // drop paragraphs left empty by missing optional points (e.g. {{point2}})
+  inner = inner.replace(/<p\b[^>]*>(?:&nbsp;|\s|[.\,\!\?\-\u2013\u2014])*<\/p>/gi, "");
   const html = renderOutreachHtml({ subject, preheader: preheader || data.company || "", innerHtml: inner, industry: ind || null });
   const text = inner.replace(/<[^>]+>/g, " ").replace(/&[a-zA-Z]+;/g, " ").replace(/\s+/g, " ").trim();
   return { subject, html, text, data };
@@ -184,7 +186,7 @@ export async function refreshPendingOutreachEmails(): Promise<{ refreshed: numbe
     `SELECT email_type, updated_at FROM email_templates WHERE email_type IN ('outreach-intro','outreach-followup-1','outreach-followup-2')`
   );
   const stampByType: Record<string, string> = {};
-  for (const t of tplRes.rows) stampByType[t.email_type] = new Date(t.updated_at).getTime() + "|premium2";
+  for (const t of tplRes.rows) stampByType[t.email_type] = new Date(t.updated_at).getTime() + "|premium3";
   let refreshed = 0;
   for (const row of rows.rows) {
     const td = row.template_data || {};
