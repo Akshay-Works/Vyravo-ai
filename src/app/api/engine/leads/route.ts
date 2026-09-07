@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { db } from "@/db";
 import { leads, activities } from "@/db/schema";
 import { eq, ilike, and, isNull } from "drizzle-orm";
+import { contactPriorityOf, ensureContactPriorityColumn } from "@/lib/leads/quality";
 
 // only genuine LinkedIn profile/company URLs are accepted on ingest
 const LI_RE = /^(https?:\/\/)?(([\w-]+\.)?linkedin\.com)\/(in|company|pub)\/[A-Za-z0-9\-_%]+/i;
@@ -20,6 +21,18 @@ export async function POST(request: NextRequest) {
   const linkedinUrl = typeof body.linkedinUrl === "string" && LI_RE.test(body.linkedinUrl.trim())
     ? body.linkedinUrl.trim()
     : null;
+
+  // ---- LEAD DATA QUALITY RULE: email OR phone is MANDATORY ----
+  const contactPriority = contactPriorityOf({
+    email: body.email, phone: body.phone, website: body.businessWebsite, linkedin: linkedinUrl,
+  });
+  if (contactPriority === 0) {
+    return Response.json(
+      { success: false, rejected: true, reason: "no valid email AND no valid phone — mandatory contact rule (website/LinkedIn are enrichment, not qualification)" },
+      { status: 400 }
+    );
+  }
+  await ensureContactPriorityColumn();
 
   // back-fill: if the lead already exists but has no LinkedIn URL, store it now
   // (so LinkedIn outreach has a recipient for previously-pushed leads too)
@@ -68,6 +81,7 @@ export async function POST(request: NextRequest) {
     status: "active",
     priority: body.priority || "medium",
     source: body.source || "lead_engine",
+    contactPriority: contactPriority,
     tags: body.tags || [],
   }).returning();
 

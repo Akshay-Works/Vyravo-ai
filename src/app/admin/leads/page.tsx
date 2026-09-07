@@ -4,6 +4,7 @@ import { leads } from "@/db/schema";
 import { desc } from "drizzle-orm";
 import { isAdminAuthenticated } from "@/lib/knowledge-base/auth";
 import { ensureLinkedInSchema } from "@/lib/linkedin/pipeline";
+import { ensureContactPriorityColumn } from "@/lib/leads/quality";
 import { ensureWhatsAppSchema } from "@/lib/whatsapp/pipeline";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +18,27 @@ const liStatusColor = (s: string | null) =>
   : s ? "bg-violet-500/15 text-violet-400 border-violet-500/30"
   : "bg-zinc-500/15 text-zinc-400 border-zinc-500/30";
 
+// Lead Data Quality Rule — contactability chip (P1..P4; old rows without the
+// column are recomputed inline so history still shows a honest label).
+const prioColor = (p: number) =>
+  p === 1 ? "bg-green-500/15 text-green-400 border-green-500/30"
+  : p === 2 ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/40"
+  : p === 3 ? "bg-sky-500/15 text-sky-400 border-sky-500/30"
+  : p === 4 ? "bg-amber-500/15 text-amber-400 border-amber-500/30"
+  : "bg-zinc-500/15 text-zinc-400 border-zinc-500/30";
+
+const prioOf = (r: { contactPriority?: number | null; email?: string | null; phone?: string | null; businessWebsite?: string | null; linkedinUrl?: string | null; }) => {
+  if (r.contactPriority != null && r.contactPriority > 0) return r.contactPriority;
+  const hasEmail = !!r.email && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(r.email);
+  const hasPhone = !!r.phone && r.phone.replace(/\D/g, "").length >= 8;
+  const hasSite = !!r.businessWebsite;
+  const hasLi = !!r.linkedinUrl;
+  if (hasEmail && hasPhone) return hasSite && hasLi ? 1 : 2;
+  if (hasEmail) return 3;
+  if (hasPhone) return 4;
+  return 0;
+};
+
 const scoreColor = (s: number) =>
   s >= 90 ? "bg-green-500/15 text-green-400 border-green-500/30"
   : s >= 75 ? "bg-blue-500/15 text-blue-400 border-blue-500/30"
@@ -27,6 +49,7 @@ export default async function AdminLeadsPage() {
   if (!(await isAdminAuthenticated())) redirect("/admin/login");
   await ensureLinkedInSchema();
   await ensureWhatsAppSchema();
+  await ensureContactPriorityColumn(); // Lead Data Quality Rule — column for P1-P4
   const rows = await db.select().from(leads).orderBy(desc(leads.createdAt)).limit(120);
   const engine = rows.filter((r) => r.source === "lead_engine");
   const other = rows.filter((r) => r.source !== "lead_engine");
@@ -40,6 +63,7 @@ export default async function AdminLeadsPage() {
             <th className="p-3">Contact</th>
             <th className="p-3">Industry</th>
             <th className="p-3">Score</th>
+            <th className="p-3">Q</th>
             <th className="p-3">Stage</th>
             <th className="p-3">LinkedIn</th>
             <th className="p-3">WhatsApp</th>
@@ -71,6 +95,11 @@ export default async function AdminLeadsPage() {
                   {r.leadScore ?? 0}
                 </span>
                 {r.leadCategory && <div className="mt-1 text-xs text-grey-dark">{r.leadCategory}</div>}
+              </td>
+              <td className="p-3">
+                <span className={`inline-block rounded-full border px-2 py-0.5 text-[10px] font-semibold ${prioColor(prioOf(r))}`}>
+                  {prioOf(r) > 0 ? `P${prioOf(r)}` : "—"}
+                </span>
               </td>
               <td className="p-3 text-grey">{r.stage || "new"}</td>
               <td className="p-3">

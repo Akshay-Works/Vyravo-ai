@@ -1,6 +1,7 @@
 import { db } from "@/db";
 import { leads } from "@/db/schema";
 import { desc } from "drizzle-orm";
+import { ensureContactPriorityColumn } from "@/lib/leads/quality";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +12,7 @@ const scoreColor = (s: number) =>
   : "bg-zinc-500/15 text-zinc-400 border-zinc-500/30";
 
 export default async function CrmLeadsPage() {
+  await ensureContactPriorityColumn(); // Lead Data Quality Rule
   const rows = await db.select().from(leads).orderBy(desc(leads.createdAt)).limit(150);
   const byStage = new Map<string, number>();
   rows.forEach((r) => byStage.set(r.stage || "new", (byStage.get(r.stage || "new") || 0) + 1));

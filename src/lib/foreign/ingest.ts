@@ -6,6 +6,7 @@
 // ============================================================
 import { pool } from "@/db";
 import { ensureForeignSchema, FOREIGN_LEAD_TYPES, foreignBucket } from "./schema";
+import { qualityHasWebsite, qualityHasLinkedin } from "@/lib/leads/quality";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const LI_RE = /^(https?:\/\/)?([\w-]+\.)?linkedin\.com\/(in|company|pub)\/[A-Za-z0-9\-_%]+/i;
@@ -45,6 +46,7 @@ export type ForeignLeadIn = {
   signals?: Record<string, unknown> | null;
   website_ok?: boolean | null;
   source?: string | null;
+  contact_priority?: number | null;
   job_title?: string | null;
   decision_maker_name?: string | null;
   found_at?: string | null;
@@ -65,7 +67,20 @@ export function validateForeignLead(raw: any): { ok: true; lead: ForeignLeadIn }
   if (!OK_STATUSES.has(email_status)) return { ok: false, error: "invalid email_status" };
   const score = num(raw?.score, 0, 100);
   const website = str(raw?.website, 300);
+  // ---- LEAD DATA QUALITY RULE: email OR phone is MANDATORY ----
   const phone = str(raw?.phone, 40);
+  if (!email && !phone) {
+    return { ok: false, error: "no valid email AND no valid phone — mandatory contact rule (website/LinkedIn are enrichment, not qualification)" };
+  }
+  const contact_priority = (() => {
+    const hasEmail = !!email, hasPhone = !!phone;
+    const hasSite = qualityHasWebsite(website);
+    const hasLi = qualityHasLinkedin(raw?.linkedin_url);
+    if (hasEmail && hasPhone) return hasSite && hasLi ? 1 : 2;
+    if (hasEmail) return 3;
+    if (hasPhone) return 4;
+    return 0;
+  })();
   const linkedin_url = typeof raw?.linkedin_url === "string" && LI_RE.test(raw.linkedin_url.trim()) ? raw.linkedin_url.trim().slice(0, 300) : null;
   const country_code = str(raw?.country_code, 2)?.toLowerCase() || null;
   const country_name = str(raw?.country_name, 80) || (country_code ? country_code.toUpperCase() : null);
@@ -102,6 +117,7 @@ export function validateForeignLead(raw: any): { ok: true; lead: ForeignLeadIn }
       agency_services, agency_type, white_label_fit, partnership_angle, signals,
       website_ok: typeof raw?.website_ok === "boolean" ? raw.website_ok : null,
       source: str(raw?.source, 30) || "foreign_engine",
+      contact_priority,
       job_title, decision_maker_name, found_at, score_reasons,
     },
   };
@@ -169,6 +185,7 @@ export async function upsertForeignLead(l: ForeignLeadIn): Promise<{ action: "cr
          outreach_drafts = COALESCE($25::jsonb, outreach_drafts),
          website_ok = COALESCE($26, website_ok),
          white_label_fit = COALESCE(NULLIF($27,''), white_label_fit),
+         contact_priority = GREATEST(COALESCE(contact_priority, 0), $29),
          last_enriched_at = now(),
          updated_at = now()
        WHERE id = $28`,
@@ -182,7 +199,7 @@ export async function upsertForeignLead(l: ForeignLeadIn): Promise<{ action: "cr
         l.why_this_lead || null, l.recommended_offer || null, l.partnership_angle || null,
         JSON.stringify(l.agency_services || []), JSON.stringify(l.score_reasons || null),
         JSON.stringify(l.outreach_drafts || null), l.website_ok, l.white_label_fit || null,
-        existing.id,
+        existing.id, l.contact_priority ?? 0,
       ]
     );
     return { action: "merged", id: existing.id };
@@ -199,8 +216,8 @@ export async function upsertForeignLead(l: ForeignLeadIn): Promise<{ action: "cr
        email_verification_status, email_verification_source, email_verified_at,
        why_this_lead, recommended_offer, outreach_drafts, score_reasons,
        agency_type, agency_services, white_label_fit, partnership_angle,
-       website_ok, last_enriched_at, created_at, updated_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,'active','medium',$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,now(),now())
+       website_ok, contact_priority, last_enriched_at, created_at, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,'active','medium',$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,now(),now())
      RETURNING id`,
     [
       l.decision_maker_name || l.company_name, email, l.phone, l.company_name, website, l.industry, l.company_size, l.country_name || l.country_code || "Unknown",
@@ -210,7 +227,7 @@ export async function upsertForeignLead(l: ForeignLeadIn): Promise<{ action: "cr
       l.email_status || "UNKNOWN", l.email_source || null, l.email_verified_at || null,
       l.why_this_lead, l.recommended_offer, JSON.stringify(l.outreach_drafts || null), JSON.stringify(l.score_reasons || null),
       l.agency_type, JSON.stringify(l.agency_services || []), l.white_label_fit, l.partnership_angle,
-      l.website_ok, l.found_at ? new Date(l.found_at) : new Date(),
+      l.website_ok, l.contact_priority ?? 0, l.found_at ? new Date(l.found_at) : new Date(),
     ]
   );
   // a lead must be contactable before it enters the email pipeline:

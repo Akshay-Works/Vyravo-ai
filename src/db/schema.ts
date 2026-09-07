@@ -16,6 +16,9 @@ export const leads = pgTable("leads", {
   companySize: text("company_size"),
   country: text("country"),
   
+  // Lead Data Quality Rule — contactability priority (1-4, 0=rejected)
+  contactPriority: integer("contact_priority"),
+
   // Qualification
   currentSoftware: text("current_software"),
   biggestChallenge: text("biggest_challenge"),

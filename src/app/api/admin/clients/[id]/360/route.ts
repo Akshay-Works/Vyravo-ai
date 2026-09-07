@@ -6,6 +6,7 @@ import { clients, leads, projects, invoices, meetings, activities, tasks } from 
 import { proposals } from "@/db/proposal-schema";
 import { clientUsers, clientFiles, clientMessages } from "@/db/portal-schema";
 import { workflowExecutions } from "@/db/workflow-schema";
+import { ensureContactPriorityColumn } from "@/lib/leads/quality";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,7 @@ export async function GET(
 ) {
   if (!(await isAdminAuthenticated())) return Response.json({ error: "Unauthorized" }, { status: 401 });
   try {
+    await ensureContactPriorityColumn(); // Lead Data Quality Rule
     const { id } = await params;
     const cid = Number(id);
 

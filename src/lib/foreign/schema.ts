@@ -26,7 +26,8 @@ export async function ensureForeignSchema(): Promise<void> {
       ADD COLUMN IF NOT EXISTS white_label_fit text,
       ADD COLUMN IF NOT EXISTS partnership_angle text,
       ADD COLUMN IF NOT EXISTS website_ok boolean,
-      ADD COLUMN IF NOT EXISTS last_enriched_at timestamptz
+      ADD COLUMN IF NOT EXISTS last_enriched_at timestamptz,
+      ADD COLUMN IF NOT EXISTS contact_priority integer -- Lead Data Quality Rule: 1-4 (0 = rejected)
   `);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_leads_lead_type ON leads(lead_type)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_leads_country ON leads(country)`);
