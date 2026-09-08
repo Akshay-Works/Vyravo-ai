@@ -42,6 +42,22 @@ function imapCreds(): { user: string; pass: string; host: string; port: number }
 
 const short = (s: unknown, n = 40) => String(s ?? "").slice(0, n).replace(/\s+/g, " ");
 
+/** Real prospect reply, or a mail-system notification threaded onto the
+ *  conversation (bounce/Delay from mailer-daemon, vacation autoresponder)?
+ *  Notifications must NEVER flip a lead to "replied". */
+function classifyInbound(headers: Record<string, string>, subject: string): "reply" | "bounce" | "transient" | "autoreply" {
+  const from = String(headers.from || "");
+  const subj = String(subject || "");
+  const isDaemon = /mailer-daemon|postmaster|mail-delivery|mailer@|delivery status|googlemail\.com/i.test(from);
+  const isBounceSubj = /delivery status notification|undeliver|returned mail|failure notice|mail delivery failed|delivery has failed|not delivered|invalid recipient/i.test(subj);
+  const isDelaySubj = /delayed|stalled|will be retried|transient/i.test(subj);
+  const isAutoSubj = /auto[- ]reply|automatic reply|out of office|away from|vacation|autoresponde|auto acknowledged/i.test(subj);
+  if (isDaemon && isBounceSubj) return isDelaySubj ? "transient" : "bounce";
+  if (isDaemon && isDelaySubj) return "transient";
+  if (isAutoSubj) return "autoreply";
+  return "reply";
+}
+
 /** RFC822 header block → object (lowercased keys, unfolded continuations). */
 function parseHeadersFromSource(source: string): Record<string, string> {
   const head = source.split(/\r?\n\r?\n/, 1)[0] || "";
@@ -108,8 +124,10 @@ export async function pollGmailReplies(opts: { windowDays?: number } = {}): Prom
             const messageId = normalizeMessageId(headers["message-id"]);
             if (!messageId) continue;
             const threadIds = extractReplyMessageIds(headers);
+            const kind = classifyInbound(headers, subject);
 
             // ---- locate the lead ----
+            // (bounces/autoreplies still need the lead to fail its events)
             let leadId: number | null = null;
             if (threadIds.length) {
               const r = await pool.query(
@@ -133,6 +151,37 @@ export async function pollGmailReplies(opts: { windowDays?: number } = {}): Prom
               if ((r2.rowCount ?? 0) > 0) leadId = Number(r2.rows[0].lead_id);
             }
             if (leadId == null) continue; // unmatched → retried on later polls
+
+            if (kind !== "reply") {
+              // mail-system notification, not a human reply:
+              //  - bounce  → mark the matching event failed (no follow-ups will
+              //              ever fire from a failed event); lead NOT touched
+              //  - transient/autoreply → ignore entirely
+              if (kind === "bounce") {
+                const ups = await pool.query(
+                  `UPDATE outreach_events SET status = 'failed',
+                      error_message = 'bounced (provider)', failed_at = now()
+                   WHERE resend_id = ANY($1::text[]) AND status = 'sent'`,
+                  [threadIds]
+                );
+                await pool.query(
+                  `UPDATE email_queue q SET status = 'skipped'
+                   FROM outreach_events e
+                   WHERE q.status = 'pending'
+                     AND q.template_data->>'outreach_event_id' = e.id::text
+                     AND e.resend_id = ANY($1::text[])`,
+                  [threadIds]
+                );
+                console.log(`[REPLY] BOUNCE_DETECTED lead=${leadId} msg=${short(messageId)} failed_events=${ups.rowCount ?? 0}`);
+              } else {
+                console.log(`[REPLY] ${kind === "autoreply" ? "AUTOREPLY_IGNORED" : "TRANSIENT_DELAY_IGNORED"} lead=${leadId} msg=${short(messageId)}`);
+              }
+              await pool.query(
+                `INSERT INTO outreach_replies_seen (message_id, lead_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+                [messageId, leadId]
+              );
+              continue;
+            }
 
             result.matched++;
             console.log(`[REPLY] REPLY_RECEIVED lead=${leadId} msg=${short(messageId)} from=${short(fromEmail)} subject=${short(subject)}`);
@@ -177,7 +226,15 @@ export async function backfillSentMessageIds(): Promise<{ backfilled: number; re
   let backfilled = 0;
   try {
     await withImap(async (client) => {
-      await client.mailboxOpen("[Gmail]/Sent", { readOnly: true });
+      // mailbox names differ by locale/Gmail version — pick whichever exists
+      const boxes = await client.list();
+      const names = boxes.map((b) => String(b.path || ""));
+      const sentBox =
+        names.find((n) => /\[gmail\]\/sent/i.test(n)) ||
+        names.find((n) => /^sent(\s+mail)?$/i.test(n)) ||
+        names.find((n) => /sent/i.test(n));
+      if (!sentBox) throw new Error("no Sent mailbox found");
+      await client.mailboxOpen(sentBox, { readOnly: true });
       const uids: number[] = ((await client.search({ since: new Date(since.toISOString().slice(0, 10)), from: undefined } as any, { uid: true })) || []) as number[];
       if (!uids.length) return;
       for (let i = 0; i < uids.length; i += 50) {

@@ -320,7 +320,7 @@ export async function scheduleFollowUps(cfg: OutreachConfig): Promise<number> {
        JOIN outreach_events e0 ON e0.lead_id = e.lead_id AND e0.follow_up_number = 0
             AND e0.status = 'sent' AND e0.test_send = false
        WHERE e.follow_up_number = $1 AND e.status = 'sent' AND e.test_send = false
-         AND e0.sent_at + ($2 || ' days')::interval <= now()
+         AND e0.sent_at + ($2::text || ' days')::interval <= now()
          AND COALESCE(l.status, 'active') NOT IN (${BLOCKED_STATUSES.map((_, i) => `$${i + 3}`).join(",")})
          AND COALESCE(l.reply_received, false) = false
          AND NOT EXISTS (SELECT 1 FROM outreach_events e2 WHERE e2.lead_id = e.lead_id AND e2.follow_up_number = $1 + 1)
