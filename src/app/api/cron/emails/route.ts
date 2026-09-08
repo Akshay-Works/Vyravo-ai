@@ -24,8 +24,19 @@ export async function GET(request: NextRequest) {
   try {
     const result = await processEmailQueue(50);
     let outreach: any = { sent: 0, failed: 0, skipped: 0, capped: false, auto: false };
+    let replyPoll: any = { polled: 0, applied: 0, reason: "skipped" };
     try {
       await ensureOutreachSchema();
+      // inbound replies first — a reply detected here stops follow-ups before send
+      try {
+        const { pollGmailReplies, backfillSentMessageIds } = await import("@/lib/outreach/replies");
+        replyPoll = await pollGmailReplies();
+        const bf = await backfillSentMessageIds();
+        replyPoll = { ...replyPoll, backfilled: bf.backfilled || 0 };
+      } catch (e: any) {
+        console.error("Cron reply-poll error:", e?.message);
+        replyPoll = { ...replyPoll, errors: 1, reason: String(e?.message || e).slice(0, 150) };
+      }
       const cfg = await getOutreachConfig();
       // AUTO OUTREACH OFF ⇒ the cron must never send outreach emails
       // (manual "Process queue now" / "Send now" still work)
@@ -35,7 +46,7 @@ export async function GET(request: NextRequest) {
         outreach.auto = false;
       }
     } catch (e) { console.error("Cron outreach error:", e); }
-    return Response.json({ ok: true, ...result, outreach });
+    return Response.json({ ok: true, ...result, outreach, replyPoll });
   } catch (e) {
     console.error("Cron email error:", e);
     return Response.json({ error: "Failed" }, { status: 500 });

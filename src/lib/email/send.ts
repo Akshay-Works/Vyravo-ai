@@ -77,13 +77,16 @@ export async function sendEmail(options: EmailOptions): Promise<{ sent: boolean;
   if (!t) return { sent: false, error: "No email provider configured (set RESEND_API_KEY or EMAIL_PASS)", provider: "gmail" };
   try {
     const from = process.env.EMAIL_FROM || "Vyravo AI <akshay.navale.work@gmail.com>";
-    await t.sendMail({
+    const info = await t.sendMail({
       from, to: options.to, subject: options.subject,
       html: options.html || options.text,
       text: options.text || options.html?.replace(/<[^>]*>/g, ""),
       replyTo: options.replyTo || DEFAULT_REPLY_TO,
     });
-    return { sent: true, provider: "gmail" };
+    // nodemailer returns the provider Message-ID — this is the key that lets
+    // the IMAP reply poller match a reply (In-Reply-To/References) to the lead.
+    const id = info?.messageId ? String(info.messageId).replace(/^<|>$/g, "") : undefined;
+    return { sent: true, provider: "gmail", id };
   } catch (e: any) {
     console.error("Email send error:", e);
     return { sent: false, error: String(e?.message || e), provider: "gmail" };

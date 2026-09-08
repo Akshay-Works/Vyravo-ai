@@ -8,11 +8,14 @@ import { renderTemplate, leadToTemplateData } from "@/lib/email/templates";
 import { renderOutreachHtml } from "./premium";
 import { resolvePoint1, resolvePoint2 } from "./personalize";
 import { sendEmail, DEFAULT_REPLY_TO } from "@/lib/email/send";
+import { normalizeMessageId } from "./reply-parse";
 import { getOutreachConfig, type OutreachConfig } from "./config";
 
 export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-// leads with these statuses are never emailed automatically
-export const BLOCKED_STATUSES = ["contacted", "replied", "won", "lost", "do_not_contact", "skipped"];
+// leads in these states must never be emailed automatically. NOTE: 'contacted'
+// is deliberately NOT in this list — a lead that we already emailed SHOULD
+// receive follow-ups; the intro's follow-up schedule depends on it.
+export const BLOCKED_STATUSES = ["replied", "won", "lost", "do_not_contact", "skipped"];
 
 // ---------------------------------------------------------------------------
 // SCHEMA (idempotent, run on every pipeline call)
@@ -39,6 +42,25 @@ export async function ensureOutreachSchema(): Promise<void> {
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_outreach_events_status ON outreach_events(status)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_outreach_events_sent ON outreach_events(sent_at)`);
   await pool.query(`ALTER TABLE outreach_events ADD COLUMN IF NOT EXISTS delivered_at timestamptz`);
+  await pool.query(`ALTER TABLE outreach_events ADD COLUMN IF NOT EXISTS claim_started_at timestamptz`);
+  // reply tracking needs an index on the provider message-id (matching key)
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_outreach_events_resend_id ON outreach_events(resend_id)`);
+  // ---- leads: reply state (Lead Data Quality + reply pipeline) ----
+  await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS reply_received boolean NOT NULL DEFAULT false`);
+  await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS replied_at timestamptz`);
+  await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS last_inbound_email_at timestamptz`);
+  await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS latest_reply_message_id text`);
+  await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS latest_reply_subject text`);
+  await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS latest_reply_preview text`);
+  await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS outreach_started_at timestamptz`);
+  await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS follow_up_count integer NOT NULL DEFAULT 0`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_leads_reply_received ON leads(reply_received)`);
+  // ---- processed inbox replies (idempotency for duplicate events/retries) ----
+  await pool.query(`CREATE TABLE IF NOT EXISTS outreach_replies_seen (
+    message_id text PRIMARY KEY,
+    lead_id integer NOT NULL REFERENCES leads(id) ON DELETE CASCADE,
+    matched_at timestamptz DEFAULT now()
+  )`);
   await pool.query(`CREATE TABLE IF NOT EXISTS outreach_config (k text PRIMARY KEY, v text NOT NULL)`);
 }
 
@@ -285,6 +307,7 @@ export async function generateAndQueue(cfg: OutreachConfig, opts: { leadId?: num
 // FOLLOW-UPS — schedule based on days since last send, only when no reply/DNC
 // ---------------------------------------------------------------------------
 export async function scheduleFollowUps(cfg: OutreachConfig): Promise<number> {
+  await ensureOutreachSchema(); // reply_received column may not exist yet on fresh DBs
   await ensureOutreachTemplates();
   const days = cfg.follow_up_days.length ? cfg.follow_up_days : [3, 7];
   let scheduled = 0;
@@ -299,6 +322,7 @@ export async function scheduleFollowUps(cfg: OutreachConfig): Promise<number> {
        WHERE e.follow_up_number = $1 AND e.status = 'sent' AND e.test_send = false
          AND e0.sent_at + ($2 || ' days')::interval <= now()
          AND COALESCE(l.status, 'active') NOT IN (${BLOCKED_STATUSES.map((_, i) => `$${i + 3}`).join(",")})
+         AND COALESCE(l.reply_received, false) = false
          AND NOT EXISTS (SELECT 1 FROM outreach_events e2 WHERE e2.lead_id = e.lead_id AND e2.follow_up_number = $1 + 1)
        LIMIT 100`,
       [n, days[n], ...BLOCKED_STATUSES]
@@ -324,6 +348,7 @@ export async function scheduleFollowUps(cfg: OutreachConfig): Promise<number> {
         })]
       );
       scheduled++;
+      console.log(`[SEND] FOLLOWUP_SCHEDULED lead=${ev.lead_id} followup=${n + 1} due_after_day=${days[n]}`);
     }
   }
   return scheduled;
@@ -341,6 +366,18 @@ export async function processOutreachQueue(cfg: OutreachConfig): Promise<{ sent:
      ORDER BY q.scheduled_for, q.id
      LIMIT 200`
   );
+
+  // ---- CRASH RECOVERY: an invocation that claimed an event ('sending') and
+  // died before marking it sent/failed would block that email forever. Reset
+  // stale claims (older than 30 min) so the next tick retries them. The
+  // residual duplicate risk (email delivered but crash before DB write) is
+  // limited to this narrow window and is logged.
+  const stale = await pool.query(
+    `UPDATE outreach_events SET status = 'queued', claim_started_at = NULL
+     WHERE status = 'sending' AND claim_started_at < now() - interval '30 minutes'
+     RETURNING id`
+  );
+  if ((stale.rowCount ?? 0) > 0) console.log(`[SEND] CRASH_RECOVERY re-queued ${stale.rowCount} stale sending event(s): ${stale.rows.map((r: any) => r.id).join(",")}`);
 
   let sentToday = 0;
   if (!cfg.test_mode) {
@@ -377,11 +414,35 @@ export async function processOutreachQueue(cfg: OutreachConfig): Promise<{ sent:
       continue;
     }
     // ================= PRODUCTION send =================
-    // duplicate protection at send-time: only a still-queued event may be sent
-    const ev = await pool.query(`SELECT id, status FROM outreach_events WHERE id = $1`, [eventId]);
-    if ((ev.rowCount ?? 0) === 0 || ev.rows[0].status !== "queued") {
+    const leadId = Number(data.leadId || 0);
+    // FRESH CHECK (immediately before sending — never rely on when the
+    // follow-up was scheduled): if the lead replied or is closed, do not send.
+    if (leadId) {
+      const lead = await pool.query(`SELECT status, reply_received FROM leads WHERE id = $1`, [leadId]);
+      if ((lead.rowCount ?? 0) === 0) {
+        await pool.query(`UPDATE email_queue SET status = 'skipped' WHERE id = $1`, [row.id]);
+        await pool.query(`UPDATE outreach_events SET status = 'cancelled' WHERE id = $1`, [eventId]);
+        skipped++;
+        continue;
+      }
+      if (lead.rows[0].reply_received || BLOCKED_STATUSES.includes(String(lead.rows[0].status))) {
+        await pool.query(`UPDATE email_queue SET status = 'skipped' WHERE id = $1`, [row.id]);
+        await pool.query(`UPDATE outreach_events SET status = 'cancelled' WHERE id = $1 AND status = 'queued'`, [eventId]);
+        skipped++;
+        console.log(`[SEND] FOLLOWUP_SKIPPED_REPLY lead=${leadId} event=${eventId} queue=${row.id} status=${lead.rows[0].status} reply=${lead.rows[0].reply_received}`);
+        continue;
+      }
+    }
+    // duplicate/concurrency protection: ATOMIC claim — only one worker can own
+    // the send. A second invocation sees status != 'queued' and skips.
+    const claim = await pool.query(
+      `UPDATE outreach_events SET status = 'sending', claim_started_at = now() WHERE id = $1 AND status = 'queued' RETURNING id`,
+      [eventId]
+    );
+    if ((claim.rowCount ?? 0) === 0) {
       await pool.query(`UPDATE email_queue SET status = 'skipped' WHERE id = $1`, [row.id]);
       skipped++;
+      console.log(`[SEND] DUPLICATE_EVENT_IGNORED event=${eventId} queue=${row.id} — already claimed/sent by another run`);
       continue;
     }
     const to = String(data.to || "");
@@ -404,16 +465,24 @@ export async function processOutreachQueue(cfg: OutreachConfig): Promise<{ sent:
         `UPDATE outreach_events SET status = 'sent', sent_at = now(), resend_id = $2, test_send = false WHERE id = $1`,
         [eventId, (result as any).id || null]
       );
-      const leadId = Number(data.leadId);
       if (leadId) {
         const fn = Number(data.followUpNumber || 0);
         const delay = nextFollowUpDelay(cfg.follow_up_days, fn);
+        // NEW -> CONTACTED on first outreach; outreach_started_at once;
+        // follow_up_count tracks the highest follow-up number sent.
         await pool.query(
-          `UPDATE leads SET last_contacted_at = now(), next_follow_up = $1 WHERE id = $2`,
-          [delay != null ? new Date(Date.now() + delay * 86400000) : null, leadId]
+          `UPDATE leads SET
+             status = CASE WHEN status IN ('new','active') THEN 'contacted' ELSE status END,
+             last_contacted_at = now(),
+             next_follow_up = $2,
+             outreach_started_at = COALESCE(outreach_started_at, now()),
+             follow_up_count = GREATEST(follow_up_count, $3)
+           WHERE id = $1`,
+          [leadId, delay != null ? new Date(Date.now() + delay * 86400000) : null, fn]
         );
       }
       sent++;
+      console.log(`[SEND] EMAIL_SENT lead=${leadId} event=${eventId} queue=${row.id} followup=${data.followUpNumber || 0} provider=${result.provider} id=${String((result as any).id || "").slice(0, 48)}`);
     } else {
       await pool.query(`UPDATE email_queue SET status = 'failed' WHERE id = $1`, [row.id]);
       await pool.query(
@@ -421,6 +490,7 @@ export async function processOutreachQueue(cfg: OutreachConfig): Promise<{ sent:
         [eventId, String(result.error || "send failed").slice(0, 500)]
       );
       failed++;
+      console.log(`[SEND] EMAIL_FAILED lead=${leadId} event=${eventId} queue=${row.id} provider=${result.provider} error=${String(result.error || "").slice(0, 120)}`);
     }
   }
   return { sent, failed, skipped, capped, truncated, batchCap: BATCH_CAP, testMode: cfg.test_mode };
@@ -472,9 +542,16 @@ export async function sendOutreachNow(leadId: number): Promise<{ ok: boolean; er
     );
     const delay = nextFollowUpDelay(cfg.follow_up_days, Number(event.follow_up_number || 0));
     await pool.query(
-      `UPDATE leads SET last_contacted_at = now(), next_follow_up = $1 WHERE id = $2`,
-      [delay != null ? new Date(Date.now() + delay * 86400000) : null, leadId]
+      `UPDATE leads SET
+         status = CASE WHEN status IN ('new','active') THEN 'contacted' ELSE status END,
+         last_contacted_at = now(),
+         next_follow_up = $1,
+         outreach_started_at = COALESCE(outreach_started_at, now()),
+         follow_up_count = GREATEST(follow_up_count, $2)
+       WHERE id = $3`,
+      [delay != null ? new Date(Date.now() + delay * 86400000) : null, Number(event.follow_up_number || 0), leadId]
     );
+    console.log(`[SEND] EMAIL_SENT lead=${leadId} event=${event.id} followup=${event.follow_up_number || 0} provider=${result.provider} id=${String((result as any).id || "").slice(0, 48)}`);
     return { ok: true, to };
   }
   await pool.query(`UPDATE outreach_events SET status = 'failed', error_message = $2, failed_at = now() WHERE id = $1`, [event.id, String(result.error || "send failed").slice(0, 500)]);
@@ -516,10 +593,64 @@ export async function retryLead(leadId: number): Promise<{ ok: boolean; error?: 
   return { ok: true };
 }
 
-export async function markReplied(leadId: number): Promise<void> {
-  await pool.query(`UPDATE leads SET status = 'replied', next_follow_up = NULL WHERE id = $1`, [leadId]);
-  await pool.query(`UPDATE outreach_events SET status = 'cancelled' WHERE lead_id = $1 AND status = 'queued'`, [leadId]);
-  await pool.query(`UPDATE email_queue SET status = 'skipped' WHERE lead_id = $1 AND status = 'pending' AND template_data->>'outreach_event_id' IS NOT NULL`, [leadId]);
+export interface ReplyMeta { messageId?: string | null; subject?: string | null; preview?: string | null; }
+
+/**
+ * Mark a lead as replied + stop its entire follow-up chain.
+ * IDEMPOTENT: when meta.messageId is given, the message-id is recorded in
+ * outreach_replies_seen FIRST — a duplicate event (provider retry, cron
+ * retry, Vercel retry) is ignored and reported as "duplicate".
+ * Returns "applied" | "duplicate" | "missing".
+ */
+export async function markReplied(leadId: number, meta: ReplyMeta = {}): Promise<"applied" | "duplicate" | "missing"> {
+  await ensureOutreachSchema();
+  const normId = meta.messageId ? normalizeMessageId(meta.messageId) : null;
+  if (normId) {
+    const seen = await pool.query(
+      `INSERT INTO outreach_replies_seen (message_id, lead_id) VALUES ($1, $2)
+       ON CONFLICT (message_id) DO NOTHING RETURNING message_id`,
+      [normId, leadId]
+    );
+    if ((seen.rowCount ?? 0) === 0) {
+      console.log(`[REPLY] DUPLICATE_EVENT_IGNORED lead=${leadId} msg=${String(normId).slice(0, 60)}`);
+      return "duplicate";
+    }
+  }
+  const lead = await pool.query(`SELECT id, status FROM leads WHERE id = $1`, [leadId]);
+  if ((lead.rowCount ?? 0) === 0) return "missing";
+  const firstReply = String(lead.rows[0].status || "") !== "replied";
+
+  await pool.query(
+    `UPDATE leads SET
+        reply_received = true,
+        status = 'replied',
+        replied_at = COALESCE(replied_at, now()),
+        last_inbound_email_at = now(),
+        latest_reply_message_id = COALESCE($2, latest_reply_message_id),
+        latest_reply_subject = COALESCE($3, latest_reply_subject),
+        latest_reply_preview = COALESCE($4, latest_reply_preview),
+        next_follow_up = NULL
+     WHERE id = $1`,
+    [leadId, String(normId || "").slice(0, 255) || null, (meta.subject || "").slice(0, 300) || null, (meta.preview || "").slice(0, 500) || null]
+  );
+  // stop the follow-up chain: queued/'sending' events → cancelled, queue rows → skipped
+  await pool.query(`UPDATE outreach_events SET status = 'cancelled' WHERE lead_id = $1 AND status IN ('queued','sending')`, [leadId]);
+  await pool.query(
+    `UPDATE email_queue SET status = 'skipped'
+     WHERE lead_id = $1 AND status = 'pending' AND template_data->>'outreach_event_id' IS NOT NULL`,
+    [leadId]
+  );
+  try {
+    await pool.query(
+      `INSERT INTO activities (type, action, description, lead_id, created_at)
+       VALUES ('lead', 'replied', $2, $1, now())`,
+      [leadId, firstReply ? `Lead replied — follow-ups cancelled${meta.subject ? ` ("${String(meta.subject).slice(0, 80)}")` : ""}` : "Duplicate reply event ignored for lead"]
+    );
+  } catch { /* activities table may not exist on some installs — non-fatal */ }
+
+  console.log(`[REPLY] REPLY_RECEIVED lead=${leadId} first=${firstReply} msg=${String(normId || "").slice(0, 60)}`);
+  if (firstReply) console.log(`[REPLY] REPLY_MATCHED_TO_LEAD lead=${leadId} — follow-ups cancelled, status=replied`);
+  return "applied";
 }
 
 export async function doNotContact(leadId: number): Promise<void> {
@@ -543,7 +674,7 @@ export async function getOutreachDashboard() {
     queued: await one(`SELECT count(*)::int n FROM outreach_events WHERE status = 'queued'`),
     sent: await one(`SELECT count(*)::int n FROM outreach_events WHERE status = 'sent'`),
     failed: await one(`SELECT count(*)::int n FROM outreach_events WHERE status = 'failed'`),
-    replies: await one(`SELECT count(*)::int n FROM leads WHERE status = 'replied'`),
+    replies: await one(`SELECT count(*)::int n FROM leads WHERE status = 'replied' OR reply_received = true`),
     followupsDue: await one(`SELECT count(*)::int n FROM outreach_events WHERE status = 'queued' AND follow_up_number > 0`),
     sentToday: await one(`SELECT count(*)::int n FROM outreach_events WHERE status = 'sent' AND sent_at::date = CURRENT_DATE AND test_send = false`),
     auto: (await getOutreachConfig()).auto_outreach,
@@ -553,7 +684,9 @@ export async function getOutreachDashboard() {
   const list = await pool.query(
     `SELECT e.id, e.lead_id, e.recipient_email, e.subject, e.status, e.error_message, e.follow_up_number,
             e.queued_at, e.sent_at, e.failed_at, e.delivered_at, e.test_send,
-            l.full_name, l.business_name, l.lead_score, l.status AS lead_status
+            l.full_name, l.business_name, l.lead_score, l.status AS lead_status,
+            l.reply_received, l.replied_at, l.latest_reply_subject, l.latest_reply_preview,
+            l.follow_up_count, l.outreach_started_at
      FROM outreach_events e
      LEFT JOIN leads l ON l.id = e.lead_id
      ORDER BY e.id DESC
@@ -574,6 +707,19 @@ export async function runOutreachPipeline(opts: { send?: boolean } = {}): Promis
   const gen = await generateAndQueue(cfg);
   const followups = await scheduleFollowUps(cfg);
 
+  // ---- INBOUND REPLIES: check the mailbox BEFORE sending anything, so a
+  // reply that arrived minutes ago stops the follow-up chain immediately. ----
+  let replyPoll: any = { polled: 0, matched: 0, applied: 0, reason: "skipped" };
+  let backfill: any = { backfilled: 0 };
+  try {
+    const { pollGmailReplies, backfillSentMessageIds } = await import("./replies");
+    replyPoll = await pollGmailReplies();
+    backfill = await backfillSentMessageIds();
+  } catch (e: any) {
+    replyPoll = { ...replyPoll, errors: 1, reason: String(e?.message || e).slice(0, 200) };
+    console.error("[REPLY] poll/backfill crashed (pipeline continues):", String(e?.message || e).slice(0, 200));
+  }
+
   let sendResult: any = null;
   // auto-send only when AUTO OUTREACH is ON (test mode still respected)
   if (opts.send && cfg.auto_outreach) {
@@ -582,6 +728,9 @@ export async function runOutreachPipeline(opts: { send?: boolean } = {}): Promis
   return {
     cfg: { auto: cfg.auto_outreach, test: cfg.test_mode, dailyLimit: cfg.daily_limit },
     pendingRefreshed: refreshed.refreshed,
-    newQueued: gen.queued, skipped: gen.skipped, followupsScheduled: followups, sendResult,
+    newQueued: gen.queued, skipped: gen.skipped, followupsScheduled: followups,
+    repliesScanned: replyPoll.polled, repliesApplied: replyPoll.applied, repliesMatched: replyPoll.matched,
+    replyPollError: replyPoll.reason || null, messageIdsBackfilled: backfill.backfilled || 0,
+    sendResult,
   };
 }

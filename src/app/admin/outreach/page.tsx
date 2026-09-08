@@ -12,6 +12,9 @@ type Event = {
   test_send: boolean;
   full_name: string | null; business_name: string | null;
   lead_score: number | null; lead_status: string | null;
+  reply_received: boolean | null; replied_at: string | null;
+  latest_reply_subject: string | null; latest_reply_preview: string | null;
+  follow_up_count: number | null; outreach_started_at: string | null;
 };
 
 type Stats = {
@@ -125,6 +128,21 @@ export default function OutreachPage() {
     finally { setBusy(false); }
   };
 
+  const pollNow = async () => {
+    setBusy(true); setMsg("");
+    try {
+      const r = await fetch("/api/admin/outreach/run?poll=1", { method: "POST" });
+      const d = await r.json();
+      if (!d.ok) { setMsg(d.error || "Reply check failed"); }
+      else {
+        const p = d.replyPoll || {};
+        setMsg(`Inbox checked: ${p.polled ?? 0} scanned · ${p.matched ?? 0} matched · ${p.applied ?? 0} replied${d.backfilled ? ` · ${d.backfilled} message-ids recovered` : ""}${p.reason ? ` — ${p.reason}` : ""}`);
+      }
+      await load();
+    } catch { setMsg("Network error"); }
+    finally { setBusy(false); }
+  };
+
   const s = data?.stats;
   const events = data?.events || [];
 
@@ -146,6 +164,9 @@ export default function OutreachPage() {
           </span>
           <button onClick={runNow} disabled={busy} className="rounded-lg border border-primary/40 px-3 py-1.5 text-xs text-primary hover:bg-primary/10 disabled:opacity-50">
             ⚡ Run pipeline now
+          </button>
+          <button onClick={pollNow} disabled={busy} className="rounded-lg border border-emerald-500/40 px-3 py-1.5 text-xs text-emerald-400 hover:bg-emerald-500/10 disabled:opacity-50">
+            ✉ Check inbox for replies
           </button>
           <button onClick={load} className="rounded-lg border border-border px-3 py-1.5 text-xs text-grey hover:text-white disabled:opacity-50" disabled={loading}>
             Refresh
@@ -242,6 +263,17 @@ export default function OutreachPage() {
                     {ev.status}{ev.follow_up_number > 0 ? ` · F${ev.follow_up_number}` : ""}{ev.test_send ? " · TEST" : ""}
                   </span>
                 </div>
+                {(ev.reply_received || ev.lead_status === "replied") && (
+                  <p className="mt-1 text-xs text-emerald-400">
+                    <span className="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold">REPLIED</span>
+                    {ev.replied_at ? ` ${new Date(ev.replied_at).toLocaleString("en-IN")}` : ""}
+                    {ev.latest_reply_subject ? ` · “${ev.latest_reply_subject.slice(0, 60)}”` : ""}
+                    {ev.latest_reply_preview ? <span className="text-grey-dark"> · {ev.latest_reply_preview.slice(0, 90)}…</span> : null}
+                  </p>
+                )}
+                {ev.lead_status && ev.lead_status !== "active" && (
+                  <p className="mt-0.5 text-[10px] text-grey-dark">lead status: {ev.lead_status}{ev.follow_up_count ? ` · ${ev.follow_up_count} follow-up${ev.follow_up_count > 1 ? "s" : ""} sent` : ""}</p>
+                )}
                 <p className="mt-1 truncate text-xs text-grey-dark">{ev.subject}</p>
                 {ev.error_message && <p className="mt-1 truncate text-[11px] text-red-400">{ev.error_message}</p>}
                 <div className="mt-2 flex flex-wrap gap-1.5">

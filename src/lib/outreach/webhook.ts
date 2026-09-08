@@ -11,7 +11,7 @@
 // ============================================================================
 import crypto from "node:crypto";
 import { pool } from "@/db";
-import { doNotContact } from "./pipeline";
+import { doNotContact, markReplied } from "./pipeline";
 
 export function verifySvixSignature(
   secret: string,
@@ -65,6 +65,16 @@ export async function handleResendEvent(payload: any): Promise<string> {
         [ev.rows[0].id]
       );
       return "complained";
+    }
+    // Resend reply events (available when the domain has inbound/reply
+    // tracking enabled). Idempotent via markReplied's seen-record.
+    case "email.replied": {
+      const res = await markReplied(Number(ev.rows[0].lead_id), {
+        messageId: resendId,
+        subject: data?.subject || payload?.data?.email?.subject,
+        preview: data?.preview || data?.snippet || data?.text || null,
+      });
+      return res === "applied" ? "replied" : res === "duplicate" ? "duplicate-ignored" : "replied-no-change";
     }
     default:
       return "ignored";
