@@ -16,11 +16,24 @@ export function qualityValidEmail(v: unknown): boolean {
   return EMAIL_RE.test(v.trim());
 }
 
-/** Phone must be plausible: 8–15 digits after stripping separators/plus. */
+/**
+ * Phone must be plausible: 8–15 digits after stripping separators/plus.
+ * Segment-aware: the value may hold several numbers ("+91 X;+91 Y" from OSM);
+ * the row is contactable if ANY number in it is valid, so a real number is
+ * never rejected just because a second was appended.
+ */
 export function qualityValidPhone(v: unknown): boolean {
   if (typeof v !== "string" || !v.trim()) return false;
-  const digits = v.replace(/\D/g, "");
-  return digits.length >= 8 && digits.length <= 15;
+  const raw = v.trim();
+  // split on separators first ("+91 X;+91 Y") then validate each chunk
+  const chunks = raw.split(/[;&,|]|&|\s{2,}/).map((c) => c.trim()).filter(Boolean);
+  for (const c of chunks) {
+    const digits = c.replace(/\D/g, "");
+    if (digits.length >= 8 && digits.length <= 15) return true;
+  }
+  // fallback: the whole value is one (separator-free) number
+  const all = raw.replace(/\D/g, "");
+  return all.length >= 8 && all.length <= 15;
 }
 
 export function qualityHasWebsite(v: unknown): boolean {
