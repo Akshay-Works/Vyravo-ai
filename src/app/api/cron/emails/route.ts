@@ -23,6 +23,12 @@ export async function GET(request: NextRequest) {
   }
   try {
     const result = await processEmailQueue(50);
+    // daily workflow rescue (no 3rd Hobby cron needed)
+    let workflows: any = { rescued: 0, failed: 0 };
+    try {
+      const { sweepStuckWorkflows } = await import("@/lib/workflows/engine");
+      workflows = await sweepStuckWorkflows();
+    } catch (e) { console.error("Cron workflow sweep error:", e); }
     let outreach: any = { sent: 0, failed: 0, skipped: 0, capped: false, auto: false };
     let replyPoll: any = { polled: 0, applied: 0, reason: "skipped" };
     try {
@@ -46,7 +52,7 @@ export async function GET(request: NextRequest) {
         outreach.auto = false;
       }
     } catch (e) { console.error("Cron outreach error:", e); }
-    return Response.json({ ok: true, ...result, outreach, replyPoll });
+    return Response.json({ ok: true, ...result, outreach, replyPoll, workflows });
   } catch (e) {
     console.error("Cron email error:", e);
     return Response.json({ error: "Failed" }, { status: 500 });

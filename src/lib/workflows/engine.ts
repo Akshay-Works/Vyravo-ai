@@ -411,10 +411,51 @@ async function logActivityFor(payload: any, type: string, action: string, descri
 }
 
 // ---------------------------------------------------------------------------
+// Sweeper — Vercel serverless has no long-lived process: fire-and-forget
+// executions can freeze mid-flight (stuck `running`) and setTimeout retries
+// never fire. sweepStuckWorkflows() rescues them; it runs (a) lazily on
+// every monitoring-page read and (b) daily from /api/cron/emails — no 3rd
+// cron needed on Hobby. emitEvent stays fire-and-forget (caller latency).
+// ---------------------------------------------------------------------------
+export async function sweepStuckWorkflows(): Promise<{ rescued: number; failed: number }> {
+  await ensureWorkflowTables();
+  let rescued = 0, failed = 0;
+  // stale `running` (>30 min — the instance died mid-flight): mark failed so
+  // it shows honestly and becomes retryable from the monitoring page
+  const stale = await db.select().from(workflowExecutions).where(
+    and(
+      eq(workflowExecutions.status, "running" as any),
+      sql`${workflowExecutions.updatedAt} < now() - interval '30 minutes'`
+    )
+  ).limit(50);
+  for (const s of stale) {
+    await db.update(workflowExecutions).set({
+      status: "failed" as any,
+      lastError: "stale running: serverless instance froze mid-execution (auto-marked by sweeper)",
+      updatedAt: new Date(),
+    }).where(eq(workflowExecutions.id, s.id));
+    failed++;
+  }
+  // `pending` (>5 min — fire-and-forget never ran) + `retrying` past due:
+  // execute now, bounded so one sweep can't blow the 60s cron budget
+  const due = await db.select().from(workflowExecutions).where(
+    sql`(${workflowExecutions.status} = 'pending' AND ${workflowExecutions.createdAt} < now() - interval '5 minutes')
+      OR (${workflowExecutions.status} = 'retrying' AND (${workflowExecutions.nextRetryAt} IS NULL OR ${workflowExecutions.nextRetryAt} <= now()))`
+  ).limit(10);
+  for (const d of due) {
+    try { await executeWorkflow(d.workflowKey); rescued++; }
+    catch (e) { console.error(`sweeper: ${d.workflowKey} failed:`, e); }
+  }
+  if (rescued || failed) console.log(`workflow sweeper: ${rescued} rescued, ${failed} stale->failed`);
+  return { rescued, failed };
+}
+
+// ---------------------------------------------------------------------------
 // Monitoring + retry
 // ---------------------------------------------------------------------------
 export async function listWorkflowExecutions(opts: { status?: string; limit?: number } = {}) {
   await ensureWorkflowTables();
+  await sweepStuckWorkflows().catch(() => {}); // self-healing read
   const limit = Math.min(opts.limit || 50, 200);
   const filters: any[] = [];
   if (opts.status) filters.push(eq(workflowExecutions.status, opts.status as any));
