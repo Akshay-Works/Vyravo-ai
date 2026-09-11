@@ -67,10 +67,10 @@ export function validateForeignLead(raw: any): { ok: true; lead: ForeignLeadIn }
   if (!OK_STATUSES.has(email_status)) return { ok: false, error: "invalid email_status" };
   const score = num(raw?.score, 0, 100);
   const website = str(raw?.website, 300);
-  // ---- LEAD DATA QUALITY RULE: email OR phone is MANDATORY ----
+  // ---- FOREIGN EMAIL RULE: a valid email is COMPULSORY ----
   const phone = str(raw?.phone, 40);
-  if (!email && !phone) {
-    return { ok: false, error: "no valid email AND no valid phone — mandatory contact rule (website/LinkedIn are enrichment, not qualification)" };
+  if (!email) {
+    return { ok: false, error: "email is compulsory for foreign leads — phone-only rows are rejected" };
   }
   const contact_priority = (() => {
     const hasEmail = !!email, hasPhone = !!phone;
