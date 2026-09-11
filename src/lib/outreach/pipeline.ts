@@ -4,6 +4,7 @@
 // Resend (sendEmail) infrastructure. Idempotent at the DB level.
 // ============================================================================
 import { pool } from "@/db";
+import { promises as dns } from "node:dns";
 import { renderTemplate, leadToTemplateData } from "@/lib/email/templates";
 import { renderOutreachHtml } from "./premium";
 import { resolvePoint1, resolvePoint2 } from "./personalize";
@@ -98,7 +99,8 @@ const OUTREACH_TEMPLATES: { type: string; name: string; subject: string; body: s
       "<p style=\"margin:0 0 16px;\">{{greeting}}</p>" +
       "<p style=\"margin:0 0 16px;\">Last note from me, I promise. If the gap I mentioned is on your list this quarter, I'd genuinely enjoy showing you what we do — {{services}}.</p>" +
       "<p style=\"margin:0 0 16px;\">{{point2}}</p>" +
-      "<p style=\"margin:0 0 24px;\">Either way, I'll leave you with one thought — {{point1}}</p>",
+      "<p style=\"margin:0 0 24px;\">Either way, I'll leave you with one thought — {{point1}}</p>" +
+      "<p style=\"margin:0 0 24px;\">Worth a 15-minute call this week? If not, just reply &ldquo;not now&rdquo; and I'll close the loop — no hard feelings.</p>",
   },
 ];
 
@@ -250,7 +252,7 @@ export async function discoverNewLeads(cfg: OutreachConfig): Promise<any[]> {
        AND COALESCE(l.status, 'active') NOT IN (${BLOCKED_STATUSES.map((_, i) => `$${i + 1}`).join(",")})
        AND COALESCE(l.lead_score, 0) >= $${BLOCKED_STATUSES.length + 1}
        AND NOT EXISTS (SELECT 1 FROM outreach_events e WHERE e.lead_id = l.id)
-     ORDER BY l.lead_score DESC, l.id DESC
+     ORDER BY l.contact_priority ASC NULLS LAST, l.lead_score DESC, l.id DESC
      LIMIT 200`,
     [...BLOCKED_STATUSES, cfg.min_score]
   );
@@ -354,6 +356,25 @@ export async function scheduleFollowUps(cfg: OutreachConfig): Promise<number> {
   return scheduled;
 }
 
+// Pre-send MX check: skip dead domains without spending sender reputation.
+// Only a DEFINITIVE no-mx fails; DNS flakes/timeouts pass through (we never
+// block a real send on a flaky lookup — the provider bounce path still catches).
+async function domainHasMx(email: string): Promise<"ok" | "bad" | "unknown"> {
+  const domain = String(email || "").split("@")[1]?.trim().toLowerCase();
+  if (!domain || !domain.includes(".")) return "bad";
+  try {
+    const mxs = await Promise.race([
+      dns.resolveMx(domain),
+      new Promise<never>((_, rej) => setTimeout(() => rej(new Error("mx-timeout")), 3000)),
+    ]);
+    return mxs && mxs.length ? "ok" : "bad";
+  } catch (e: any) {
+    const code = String(e?.code || e?.message || "");
+    if (/ENOTFOUND|ENODATA|EBADNAME/i.test(code)) return "bad";
+    return "unknown";
+  }
+}
+
 // ---------------------------------------------------------------------------
 // SEND — controlled, rate-limited, limit-capped, test-mode aware
 // ---------------------------------------------------------------------------
@@ -363,7 +384,7 @@ export async function processOutreachQueue(cfg: OutreachConfig): Promise<{ sent:
     `SELECT q.* FROM email_queue q
      WHERE q.status = 'pending' AND q.scheduled_for <= now()
        AND q.template_data->>'outreach_event_id' IS NOT NULL
-     ORDER BY q.scheduled_for, q.id
+     ORDER BY (q.template_data->>'followUpNumber')::int DESC NULLS LAST, q.scheduled_for, q.id
      LIMIT 200`
   );
 
@@ -450,6 +471,13 @@ export async function processOutreachQueue(cfg: OutreachConfig): Promise<{ sent:
       await pool.query(`UPDATE email_queue SET status = 'failed', template_data = template_data || '{"error":"invalid recipient"}'::jsonb WHERE id = $1`, [row.id]);
       await pool.query(`UPDATE outreach_events SET status = 'failed', error_message = 'invalid recipient', failed_at = now() WHERE id = $1`, [eventId]);
       failed++;
+      continue;
+    }
+    if ((await domainHasMx(to)) === "bad") {
+      await pool.query(`UPDATE email_queue SET status = 'failed', template_data = template_data || '{"error":"no mail server (MX)"}'::jsonb WHERE id = $1`, [row.id]);
+      await pool.query(`UPDATE outreach_events SET status = 'failed', error_message = 'no mail server (MX)', failed_at = now() WHERE id = $1`, [eventId]);
+      failed++;
+      console.log(`[SEND] MX_SKIP lead=${leadId} event=${eventId} queue=${row.id} to=${to} — domain has no mail server`);
       continue;
     }
     // min gap between sends
@@ -649,7 +677,25 @@ export async function markReplied(leadId: number, meta: ReplyMeta = {}): Promise
   } catch { /* activities table may not exist on some installs — non-fatal */ }
 
   console.log(`[REPLY] REPLY_RECEIVED lead=${leadId} first=${firstReply} msg=${String(normId || "").slice(0, 60)}`);
-  if (firstReply) console.log(`[REPLY] REPLY_MATCHED_TO_LEAD lead=${leadId} — follow-ups cancelled, status=replied`);
+  if (firstReply) {
+    console.log(`[REPLY] REPLY_MATCHED_TO_LEAD lead=${leadId} — follow-ups cancelled, status=replied`);
+    // speed-to-lead: ping the owner immediately (fire-and-forget, never blocks)
+    try {
+      const to = (process.env.REPORT_EMAIL || process.env.EMAIL_USER || "").trim();
+      if (to) {
+        const esc = (s: any) => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").slice(0, 400);
+        const lr = await pool.query(`SELECT business_name, email, lead_score FROM leads WHERE id = $1`, [leadId]);
+        const nm = lr.rows[0]?.business_name || `lead ${leadId}`;
+        await sendEmail({
+          to,
+          subject: `🔥 Reply: ${nm}`,
+          html: `<p><b>${esc(nm)}</b> (${esc(lr.rows[0]?.email)}, score ${lr.rows[0]?.lead_score ?? ""}) just replied.</p><p><b>Subject:</b> ${esc(meta.subject)}</p><p>${esc(meta.preview)}</p>`,
+          replyTo: DEFAULT_REPLY_TO,
+        });
+        console.log(`[REPLY] OWNER_ALERT_SENT lead=${leadId} to=${to}`);
+      }
+    } catch (e) { console.error("reply owner-alert failed (non-fatal):", e); }
+  }
   return "applied";
 }
 
