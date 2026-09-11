@@ -281,6 +281,10 @@ export function ForeignEngineDashboard() {
             <option value="">All countries</option>
             {(facetVals("country") || []).map((v: any) => <option key={v} value={v}>{v}</option>)}
           </select>
+          <select value={filters.city || ""} onChange={(e) => setF("city", e.target.value)} className="text-xs rounded-lg border border-border bg-transparent px-2 py-1.5">
+            <option value="">All cities</option>
+            {(facetVals("city") || []).map((v: any) => <option key={v} value={v}>{v}</option>)}
+          </select>
           <select value={filters.industry || ""} onChange={(e) => setF("industry", e.target.value)} className="text-xs rounded-lg border border-border bg-transparent px-2 py-1.5">
             <option value="">All industries</option>
             {(facetVals("industry") || []).map((v: any) => <option key={v} value={v}>{v}</option>)}
@@ -303,7 +307,7 @@ export function ForeignEngineDashboard() {
             <thead>
               <tr className="text-left text-[11px] uppercase tracking-wide text-grey">
                 <th className="px-3 py-2">Score</th><th className="px-3 py-2">Type</th><th className="px-3 py-2">Company</th>
-                <th className="px-3 py-2">Country / Industry</th><th className="px-3 py-2">Email</th><th className="px-3 py-2">Decision maker</th>
+                <th className="px-3 py-2">Country / City / Industry</th><th className="px-3 py-2">Email</th><th className="px-3 py-2">Decision maker</th>
                 <th className="px-3 py-2">Stage</th><th className="px-3 py-2">Discovered</th>
               </tr>
             </thead>

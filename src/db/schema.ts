@@ -15,6 +15,7 @@ export const leads = pgTable("leads", {
   industry: text("industry"),
   companySize: text("company_size"),
   country: text("country"),
+  city: text("city"), // Neon column predates drizzle type (foreign/funnel2 pushes wrote it via raw SQL); no SQL migration needed
   
   // Lead Data Quality Rule — contactability priority (1-4, 0=rejected)
   contactPriority: integer("contact_priority"),

@@ -6,7 +6,7 @@ import { ensureForeignSchema } from "@/lib/foreign/schema";
 export const dynamic = "force-dynamic";
 
 // GET /api/admin/foreign/leads
-// Filters: type, country, industry, minScore, maxScore, emailStatus,
+// Filters: type, country, city, industry, minScore, maxScore, emailStatus,
 //          stage, source, from, to, q (name/domain/email search)
 // Sort: score | newest | country | industry | verified
 export async function GET(request: NextRequest) {
@@ -20,6 +20,7 @@ export async function GET(request: NextRequest) {
 
     if (sp.get("type")) push(`l.lead_type = ?`, sp.get("type"));
     if (sp.get("country")) push(`lower(l.country) = ?`, String(sp.get("country")).toLowerCase());
+    if (sp.get("city")) push(`lower(l.city) = ?`, String(sp.get("city")).toLowerCase());
     if (sp.get("industry")) push(`l.industry = ?`, sp.get("industry"));
     if (sp.get("minScore")) push(`l.lead_score >= ?`, Number(sp.get("minScore")) || 0);
     if (sp.get("maxScore")) push(`l.lead_score <= ?`, Number(sp.get("maxScore")) || 100);
@@ -59,7 +60,7 @@ export async function GET(request: NextRequest) {
     );
     const count = await pool.query(`SELECT count(*)::int n FROM leads l WHERE ${where}`, params);
     const facets = await pool.query(
-      `SELECT DISTINCT country, industry, lead_type, email_verification_status, source
+      `SELECT DISTINCT country, city, industry, lead_type, email_verification_status, source
        FROM leads WHERE lead_type IN ('FOREIGN_CLIENT','WHITE_LABEL_AGENCY')
        ORDER BY 1, 2 NULLS LAST`
     );

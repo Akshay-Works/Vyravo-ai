@@ -25,6 +25,7 @@ export async function GET(request: NextRequest) {
     const push = (sql: string, v: any) => { params.push(v); conds.push(sql.replace("?", `$${params.length}`)); };
     if (sp.get("type")) push(`lead_type = ?`, sp.get("type"));
     if (sp.get("country")) push(`lower(country) = ?`, String(sp.get("country")).toLowerCase());
+    if (sp.get("city")) push(`lower(city) = ?`, String(sp.get("city")).toLowerCase());
     if (sp.get("industry")) push(`industry = ?`, sp.get("industry"));
     if (sp.get("minScore")) push(`lead_score >= ?`, Number(sp.get("minScore")) || 0);
     if (sp.get("emailStatus")) push(`email_verification_status = ?`, String(sp.get("emailStatus")).toUpperCase());
