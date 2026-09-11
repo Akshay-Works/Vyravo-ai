@@ -10,8 +10,8 @@ export async function POST(request: NextRequest) {
   { const rl = rateLimit("write", clientIp(request)); if (!rl.allowed) return rateLimitResponse(rl.retryAfterSec); }
   // Events can be tracked without admin auth (for client-side tracking)
   try {
-    const body = await request.json();
-    const { eventType, ...data } = body;
+    const body = await request.json().catch(() => null);
+    const { eventType, ...data } = body || {};
     if (!eventType) return Response.json({ error: "eventType required" }, { status: 400 });
     await trackEvent(eventType, data);
     return Response.json({ success: true });

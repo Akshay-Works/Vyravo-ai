@@ -4,7 +4,13 @@ import { syncLeadToHubSpot, isHubSpotConfigured } from "@/lib/integrations/hubsp
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== "object") {
+      return Response.json(
+        { error: "Name, email, and message are required." },
+        { status: 400 }
+      );
+    }
     const { name, email, phone, company, service, message } = body;
 
     if (!name || !email || !message) {
