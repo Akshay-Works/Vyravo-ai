@@ -14,8 +14,31 @@ const ALIASES: Record<string, string> = {
   mumbai: "Mumbai",
   "navi mumbai": "Navi Mumbai",
   thane: "Thane",
-  bandra: "Bandra",
+  bandra: "Mumbai", // Mumbai suburb — rolls up to the city
   "magarpatta city": "Pune", // township in Pune, not its own city
+  // Pune suburbs/townships roll up to Pune
+  "pimpri chinchwad": "Pune",
+  pcmc: "Pune",
+  hadapsar: "Pune",
+  wakad: "Pune",
+  hinjawadi: "Pune",
+  warje: "Pune",
+  chakan: "Pune",
+  ganeshkhind: "Pune",
+  "kalyani nagar": "Pune",
+  // Mumbai suburbs roll up to Mumbai (MMR)
+  "kurla west": "Mumbai",
+  kurla: "Mumbai",
+  "borivali west": "Mumbai",
+  borivali: "Mumbai",
+  "mumbai suburban": "Mumbai",
+  vasai: "Mumbai", // MMR (Mumbai Metropolitan Region)
+  // Thane-district towns roll up to Thane
+  "thane west": "Thane",
+  dombivali: "Thane",
+  dombivli: "Thane",
+  // Navi Mumbai nodes roll up to Navi Mumbai
+  "kopar khairane": "Navi Mumbai",
   nashik: "Nashik",
   nagpur: "Nagpur",
   aurangabad: "Aurangabad",
