@@ -15,12 +15,14 @@ type Event = {
   reply_received: boolean | null; replied_at: string | null;
   latest_reply_subject: string | null; latest_reply_preview: string | null;
   follow_up_count: number | null; outreach_started_at: string | null;
+  intro_sent_at: string | null;
 };
 
 type Stats = {
   todayLeads: number; qualifiedToday: number; generated: number; queued: number;
   sent: number; failed: number; replies: number; followupsDue: number;
   sentToday: number; auto: boolean; test: boolean;
+  fu1Sent: number; fu2Sent: number;
 };
 
 type Cfg = {
@@ -55,6 +57,7 @@ export default function OutreachPage() {
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
+  const [fuFilter, setFuFilter] = useState<"all" | 0 | 1 | 2>("all");
   const [preview, setPreview] = useState<{ leadId: number; to: string; replyTo: string; subject: string; html: string; note?: string } | null>(null);
   const [editHtml, setEditHtml] = useState("");
   const [editSubject, setEditSubject] = useState("");
@@ -145,6 +148,9 @@ export default function OutreachPage() {
 
   const s = data?.stats;
   const events = data?.events || [];
+  const fuCounts: Record<string | number, number> = { 0: 0, 1: 0, 2: 0 };
+  for (const ev of events) fuCounts[ev.follow_up_number] = (fuCounts[ev.follow_up_number] || 0) + 1;
+  const visibleEvents = fuFilter === "all" ? events : events.filter((ev) => ev.follow_up_number === fuFilter);
 
   return (
     <div className="space-y-6">
@@ -185,7 +191,7 @@ export default function OutreachPage() {
         <Kpi title="Sent" value={s?.sent} icon="📨" sub={`${s?.sentToday ?? 0} today`} />
         <Kpi title="Failed" value={s?.failed} icon="⚠️" />
         <Kpi title="Replies" value={s?.replies} icon="💬" />
-        <Kpi title="Follow-ups due" value={s?.followupsDue} icon="🔁" />
+        <Kpi title="Follow-ups due" value={s?.followupsDue} icon="🔁" sub={`${(s?.fu1Sent ?? 0) + (s?.fu2Sent ?? 0)} sent · F1 ${s?.fu1Sent ?? 0} / F2 ${s?.fu2Sent ?? 0}`} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -250,9 +256,17 @@ export default function OutreachPage() {
         {/* Events */}
         <div className="rounded-xl border border-border bg-surface p-5">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-grey">Outreach log</h2>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {(["all", 0, 1, 2] as const).map((f) => (
+              <button key={String(f)} onClick={() => setFuFilter(f)}
+                className={`rounded-full border px-2.5 py-0.5 text-[11px] ${fuFilter === f ? "border-primary/60 bg-primary/15 text-primary" : "border-border text-grey hover:text-white"}`}>
+                {f === "all" ? `All (${events.length})` : f === 0 ? `Intros (${fuCounts[0]})` : `FU${f} (${fuCounts[f]})`}
+              </button>
+            ))}
+          </div>
           <div className="mt-3 max-h-96 space-y-2 overflow-y-auto pr-1">
-            {events.length === 0 && <p className="py-6 text-center text-sm text-grey-dark">No outreach emails yet — run the pipeline or generate leads first.</p>}
-            {events.map((ev) => (
+            {visibleEvents.length === 0 && <p className="py-6 text-center text-sm text-grey-dark">{events.length === 0 ? "No outreach emails yet — run the pipeline or generate leads first." : "No emails in this view."}</p>}
+            {visibleEvents.map((ev) => (
               <div key={ev.id} className="rounded-lg border border-border/60 bg-bg/40 p-3">
                 <div className="flex items-center justify-between gap-2">
                   <div className="min-w-0">
@@ -275,6 +289,9 @@ export default function OutreachPage() {
                   <p className="mt-0.5 text-[10px] text-grey-dark">lead status: {ev.lead_status}{ev.follow_up_count ? ` · ${ev.follow_up_count} follow-up${ev.follow_up_count > 1 ? "s" : ""} sent` : ""}</p>
                 )}
                 <p className="mt-1 truncate text-xs text-grey-dark">{ev.subject}</p>
+                {ev.follow_up_number > 0 && ev.intro_sent_at && (
+                  <p className="mt-0.5 text-[10px] text-grey-dark">chain: intro {new Date(ev.intro_sent_at).toLocaleDateString("en-IN")} → FU{ev.follow_up_number}{ev.sent_at ? ` sent ${new Date(ev.sent_at).toLocaleDateString("en-IN")}` : ` ${ev.status}`}</p>
+                )}
                 {ev.error_message && <p className="mt-1 truncate text-[11px] text-red-400">{ev.error_message}</p>}
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   <button onClick={() => openPreview(ev)} className="rounded border border-border px-2 py-0.5 text-[11px] text-grey hover:text-white">View</button>

@@ -722,6 +722,8 @@ export async function getOutreachDashboard() {
     failed: await one(`SELECT count(*)::int n FROM outreach_events WHERE status = 'failed'`),
     replies: await one(`SELECT count(*)::int n FROM leads WHERE status = 'replied' OR reply_received = true`),
     followupsDue: await one(`SELECT count(*)::int n FROM outreach_events WHERE status = 'queued' AND follow_up_number > 0`),
+    fu1Sent: await one(`SELECT count(*)::int n FROM outreach_events WHERE status = 'sent' AND follow_up_number = 1 AND test_send = false`),
+    fu2Sent: await one(`SELECT count(*)::int n FROM outreach_events WHERE status = 'sent' AND follow_up_number = 2 AND test_send = false`),
     sentToday: await one(`SELECT count(*)::int n FROM outreach_events WHERE status = 'sent' AND sent_at::date = CURRENT_DATE AND test_send = false`),
     auto: (await getOutreachConfig()).auto_outreach,
     test: (await getOutreachConfig()).test_mode,
@@ -730,6 +732,7 @@ export async function getOutreachDashboard() {
   const list = await pool.query(
     `SELECT e.id, e.lead_id, e.recipient_email, e.subject, e.status, e.error_message, e.follow_up_number,
             e.queued_at, e.sent_at, e.failed_at, e.delivered_at, e.test_send,
+            (SELECT e0.sent_at FROM outreach_events e0 WHERE e0.lead_id = e.lead_id AND e0.follow_up_number = 0) AS intro_sent_at,
             l.full_name, l.business_name, l.lead_score, l.status AS lead_status,
             l.reply_received, l.replied_at, l.latest_reply_subject, l.latest_reply_preview,
             l.follow_up_count, l.outreach_started_at
