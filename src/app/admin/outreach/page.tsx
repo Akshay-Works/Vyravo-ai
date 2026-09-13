@@ -177,6 +177,9 @@ export default function OutreachPage() {
           <button onClick={load} className="rounded-lg border border-border px-3 py-1.5 text-xs text-grey hover:text-white disabled:opacity-50" disabled={loading}>
             Refresh
           </button>
+          <a href="/admin/activity" className="rounded-lg border border-border px-3 py-1.5 text-xs text-grey hover:text-white">
+            📅 Sales activity
+          </a>
         </div>
       </div>
 

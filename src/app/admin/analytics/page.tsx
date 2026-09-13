@@ -15,6 +15,13 @@ const PERIODS = [
   { v: "year", l: "This Year" }, { v: "all", l: "All Time" },
 ];
 
+const DAILY_METRICS = [
+  { k: "leads", l: "Leads", icon: "🧲" }, { k: "outreach", l: "Outreach", icon: "📨" },
+  { k: "followups", l: "Follow-ups", icon: "🔁" }, { k: "replies", l: "Replies", icon: "💬" },
+  { k: "positive", l: "Positive*", icon: "⭐" }, { k: "meetings", l: "Meetings", icon: "📅" },
+  { k: "won", l: "Won", icon: "🏆" },
+];
+
 function KpiCard({ title, value, prev, format, icon }: any) {
   const displayVal = format === "money" ? `$${Number(value || 0).toLocaleString()}` : format === "pct" ? `${value || 0}%` : format === "decimal" ? Number(value || 0).toFixed(1) : String(value ?? "—");
   const change = prev > 0 ? ((value - prev) / prev * 100) : 0;
@@ -37,6 +44,7 @@ function KpiCard({ title, value, prev, format, icon }: any) {
 export default function AnalyticsDashboardPage() {
   const [period, setPeriod] = useState("30d");
   const [data, setData] = useState<any>({ overview: {}, funnel: { stages: [] }, proposals: {} });
+  const [daily, setDaily] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -45,6 +53,11 @@ export default function AnalyticsDashboardPage() {
       const res = await fetch(`/api/analytics?period=${period}`);
       const d = await res.json();
       if (d.overview || d.funnel2 || d.engine) setData(d);
+      try {
+        const rd = await fetch(`/api/admin/activity/daily`);
+        const dd = await rd.json();
+        if (!dd.error) setDaily(dd);
+      } catch {}
     } catch {} finally { setLoading(false); }
   }, [period]);
 
@@ -114,6 +127,39 @@ export default function AnalyticsDashboardPage() {
             <KpiCard title="Proposals Accepted" value={ov.proposalsAccepted?.value} prev={ov.proposalsAccepted?.prev} icon="🎉" />
             <KpiCard title="Active Clients" value={ov.activeClients} icon="🏢" />
             <KpiCard title="Active Projects" value={ov.activeProjects} icon="📋" />
+          </div>
+
+          {/* ================= DAILY PERFORMANCE ================= */}
+          <div className="rounded-xl border border-border bg-surface p-5">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+              <div>
+                <h2 className="text-lg font-semibold font-[var(--font-heading)]">Daily Performance <span className="gradient-text">(today)</span></h2>
+                <p className="text-xs text-grey">What actually happened today (IST){daily?.date ? ` · ${daily.date}` : ""} — vs previous 7-day average</p>
+              </div>
+              <Link href="/admin/activity" className="text-xs px-3 py-1.5 rounded-lg border border-primary/40 text-primary hover:bg-primary/10">📅 Sales activity →</Link>
+            </div>
+            {!daily ? <p className="text-sm text-grey-dark py-4 text-center">Loading today&apos;s numbers…</p> : (
+              <>
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+                  {DAILY_METRICS.map((m) => {
+                    const t = daily.today?.[m.k] ?? 0;
+                    const avg = daily.avg7?.[m.k];
+                    const pct = avg != null && avg > 0 ? Math.round(((t - avg) / avg) * 100) : null;
+                    return (
+                      <div key={m.k} className="rounded-lg bg-bg/60 border border-border/60 p-3">
+                        <p className="text-[10px] text-grey-dark uppercase tracking-wider">{m.icon} {m.l}</p>
+                        <p className="text-2xl font-semibold mt-0.5">{t} <span className="text-[11px] font-normal text-grey-dark">today</span></p>
+                        <p className="text-[11px] text-grey mt-0.5">7-day avg: {avg != null ? avg : "—"}</p>
+                        {pct != null ? (
+                          <p className={`text-[11px] mt-0.5 font-medium ${pct >= 0 ? "text-green-400" : "text-red-400"}`}>{pct >= 0 ? "↑" : "↓"} {Math.abs(pct)}%</p>
+                        ) : <p className="text-[11px] mt-0.5 text-grey-dark">—</p>}
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="mt-3 text-[11px] text-grey-dark">* Positive = replies without opt-out (reply sentiment is not tracked). “—” means insufficient history — no percentage manufactured.</p>
+              </>
+            )}
           </div>
 
           {/* ================= LEAD ENGINES (Funnel 1 + Funnel 2) ================= */}
