@@ -137,12 +137,14 @@ export type SegmentRow = {
   reply_rate: number | null; positive_rate: number | null; meeting_rate: number | null; win_rate: number | null;
 };
 
-async function segmentDim(col: string, label: (v: string) => string, f: Tier2Filters): Promise<SegmentRow[]> {
+async function segmentDim(col: string, label: (v: string) => string, f: Tier2Filters, isNumeric = false): Promise<SegmentRow[]> {
   const [s, e0] = bounds(f);
   const e = endExcl(e0);
   const { sql: dim, params: dp } = leadDims(f, 3);
+  // numeric cols (contact_priority) can't NULLIF against '' — cast instead
+  const segExpr = isNumeric ? `COALESCE(l.${col}::text,'(blank)')` : `COALESCE(NULLIF(l.${col},''),'(blank)')`;
   const r = await pool.query(
-    `SELECT COALESCE(NULLIF(l.${col},''),'(blank)') seg,
+    `SELECT ${segExpr} seg,
             COUNT(*)::int leads,
             COUNT(DISTINCT e0.lead_id)::int contacted,
             COUNT(DISTINCT CASE WHEN l.reply_received THEN l.id END)::int replied,
@@ -173,7 +175,7 @@ export async function segments(f: Tier2Filters) {
     segmentDim("industry", (v) => v, f),
     segmentDim("source", (v) => v, f),
     segmentDim("country", (v) => v, f),
-    segmentDim("contact_priority", PRI_LABEL, f),
+    segmentDim("contact_priority", PRI_LABEL, f, true),
   ]);
   // filter dropdown options (global, unfiltered)
   const opts = async (col: string, tbl = "leads") =>
