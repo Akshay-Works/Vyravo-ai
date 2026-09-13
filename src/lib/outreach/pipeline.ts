@@ -55,6 +55,8 @@ export async function ensureOutreachSchema(): Promise<void> {
   await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS latest_reply_preview text`);
   await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS outreach_started_at timestamptz`);
   await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS follow_up_count integer NOT NULL DEFAULT 0`);
+  await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS reply_class text`);
+  await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS reply_class_at timestamptz`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_leads_reply_received ON leads(reply_received)`);
   // ---- processed inbox replies (idempotency for duplicate events/retries) ----
   await pool.query(`CREATE TABLE IF NOT EXISTS outreach_replies_seen (
@@ -661,6 +663,14 @@ export async function markReplied(leadId: number, meta: ReplyMeta = {}): Promise
      WHERE id = $1`,
     [leadId, String(normId || "").slice(0, 255) || null, (meta.subject || "").slice(0, 300) || null, (meta.preview || "").slice(0, 500) || null]
   );
+  // Tier 2: classify the reply (deterministic rules; additive only — never
+  // blocks or changes the automation; uncertain replies stay "unknown").
+  try {
+    const { classifyReply } = await import("../activity/classify");
+    const cur = await pool.query(`SELECT latest_reply_subject, latest_reply_preview FROM leads WHERE id = $1`, [leadId]);
+    const cls = classifyReply(cur.rows[0]?.latest_reply_subject || meta.subject || null, cur.rows[0]?.latest_reply_preview || meta.preview || null);
+    await pool.query(`UPDATE leads SET reply_class = $2, reply_class_at = now() WHERE id = $1`, [leadId, cls.class]);
+  } catch (e) { console.error("reply classify failed (non-fatal):", e); }
   // stop the follow-up chain: queued/'sending' events → cancelled, queue rows → skipped
   await pool.query(`UPDATE outreach_events SET status = 'cancelled' WHERE lead_id = $1 AND status IN ('queued','sending')`, [leadId]);
   await pool.query(

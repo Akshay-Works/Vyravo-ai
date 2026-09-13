@@ -343,7 +343,7 @@ function FunnelTab() {
               ))}
             </div>
           )}
-          <p className="mt-4 text-[11px] text-grey-dark">* Positive = replies without opt-out (reply sentiment is not tracked). Won = accepted proposals.</p>
+          <p className="mt-4 text-[11px] text-grey-dark">* Positive = classified positive / interested replies. Won = accepted proposals.</p>
         </div>
       )}
     </div>
@@ -362,6 +362,7 @@ export default function ActivityPage() {
         </div>
         <div className="flex items-center gap-2">
           <Link href="/admin/analytics" className="rounded-lg border border-border px-3 py-1.5 text-xs text-grey hover:text-white">📊 Analytics</Link>
+          <Link href="/admin/insights" className="rounded-lg border border-border px-3 py-1.5 text-xs text-grey hover:text-white">💡 Insights</Link>
           <Link href="/admin/outreach" className="rounded-lg border border-border px-3 py-1.5 text-xs text-grey hover:text-white">📨 Outreach</Link>
         </div>
       </div>

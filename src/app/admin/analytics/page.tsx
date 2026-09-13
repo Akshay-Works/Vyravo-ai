@@ -92,6 +92,7 @@ export default function AnalyticsDashboardPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           <a href="/admin/visitors" className="text-xs px-3 py-1.5 rounded-lg border border-primary/40 text-primary hover:bg-primary/10">👀 Visitor traffic</a>
+          <a href="/admin/insights" className="text-xs px-3 py-1.5 rounded-lg border border-primary/40 text-primary hover:bg-primary/10">💡 Insights</a>
           {PERIODS.map((p) => (
             <button key={p.v} onClick={() => setPeriod(p.v)}
               className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${period === p.v ? "bg-primary/10 border-primary/30 text-primary" : "border-border text-grey hover:text-white"}`}>
@@ -157,7 +158,7 @@ export default function AnalyticsDashboardPage() {
                     );
                   })}
                 </div>
-                <p className="mt-3 text-[11px] text-grey-dark">* Positive = replies without opt-out (reply sentiment is not tracked). “—” means insufficient history — no percentage manufactured.</p>
+                <p className="mt-3 text-[11px] text-grey-dark">* Positive = classified positive / interested replies. “—” means insufficient history — no percentage manufactured.</p>
               </>
             )}
           </div>

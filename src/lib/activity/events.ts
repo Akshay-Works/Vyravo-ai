@@ -24,9 +24,9 @@ export const METRICS: { key: MetricKey; label: string; icon: string }[] = [
 export type Counts = Record<MetricKey, number>;
 export const ZERO: Counts = { leads: 0, outreach: 0, followups: 0, replies: 0, positive: 0, meetings: 0, won: 0 };
 
-// Reply sentiment is NOT tracked anywhere in the DB, so "positive" is an
-// honest labeled proxy: a reply that did not end in opt-out/loss.
-const POSITIVE_LEAD_FILTER = `l.reply_received = true AND COALESCE(l.status,'') NOT IN ('do_not_contact','lost','skipped')`;
+// "Positive" = replies classified positive / interested-followup by the
+// deterministic Tier 2 classifier (uncertain replies stay "unknown").
+const POSITIVE_LEAD_FILTER = `l.reply_class IN ('positive','interested_followup')`;
 
 // IST calendar-day bounds [start, end) as timestamptz params (IST has no DST).
 export function istDayBounds(dateYmd: string): [string, string] {
@@ -42,7 +42,7 @@ export function todayIst(): string {
 }
 
 // One round-trip: per-day counts for every metric inside [start, end).
-async function countsByDay(startIso: string, endIso: string): Promise<{ date: string; metric: MetricKey; n: number }[]> {
+export async function countsByDay(startIso: string, endIso: string): Promise<{ date: string; metric: MetricKey; n: number }[]> {
   const d = (col: string) => `(${col} AT TIME ZONE '${ACTIVITY_TZ}')::date`;
   const r = await pool.query(
     `SELECT d, metric, COUNT(*)::int n FROM (
@@ -110,7 +110,7 @@ export async function dayDetail(dateYmd: string) {
     leads: leads.rows, intros: intros.rows, followups: fus.rows,
     replies: replies.rows.map((x: any) => ({ ...x, after_followup: Number(x.follow_up_count || 0) > 0 })),
     meetings: meetings.rows, proposals: proposals.rows,
-    positive_note: "Positive = replies without opt-out (reply sentiment is not tracked).",
+    positive_note: "Positive = replies classified positive / interested (uncertain → Unknown).",
   };
 }
 
