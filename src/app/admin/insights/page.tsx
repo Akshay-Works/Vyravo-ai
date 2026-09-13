@@ -396,6 +396,7 @@ export default function InsightsPage() {
         <div className="flex items-center gap-2">
           <Link href="/admin/activity" className="rounded-lg border border-border px-3 py-1.5 text-xs text-grey hover:text-white">📅 Activity</Link>
           <Link href="/admin/analytics" className="rounded-lg border border-border px-3 py-1.5 text-xs text-grey hover:text-white">📊 Analytics</Link>
+          <Link href="/admin/command" className="rounded-lg border border-border px-3 py-1.5 text-xs text-grey hover:text-white">🎯 Command</Link>
         </div>
       </div>
       <div className="flex flex-wrap gap-2">

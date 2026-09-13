@@ -45,6 +45,7 @@ export default function AnalyticsDashboardPage() {
   const [period, setPeriod] = useState("30d");
   const [data, setData] = useState<any>({ overview: {}, funnel: { stages: [] }, proposals: {} });
   const [daily, setDaily] = useState<any>(null);
+  const [cmd, setCmd] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -57,6 +58,11 @@ export default function AnalyticsDashboardPage() {
         const rd = await fetch(`/api/admin/activity/daily`);
         const dd = await rd.json();
         if (!dd.error) setDaily(dd);
+      } catch {}
+      try {
+        const rc = await fetch(`/api/admin/activity/command`);
+        const cc = await rc.json();
+        if (!cc.error) setCmd(cc);
       } catch {}
     } catch {} finally { setLoading(false); }
   }, [period]);
@@ -93,6 +99,7 @@ export default function AnalyticsDashboardPage() {
         <div className="flex flex-wrap gap-2">
           <a href="/admin/visitors" className="text-xs px-3 py-1.5 rounded-lg border border-primary/40 text-primary hover:bg-primary/10">👀 Visitor traffic</a>
           <a href="/admin/insights" className="text-xs px-3 py-1.5 rounded-lg border border-primary/40 text-primary hover:bg-primary/10">💡 Insights</a>
+          <a href="/admin/command" className="text-xs px-3 py-1.5 rounded-lg border border-primary/40 text-primary hover:bg-primary/10">🎯 Command</a>
           {PERIODS.map((p) => (
             <button key={p.v} onClick={() => setPeriod(p.v)}
               className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${period === p.v ? "bg-primary/10 border-primary/30 text-primary" : "border-border text-grey hover:text-white"}`}>
@@ -128,6 +135,43 @@ export default function AnalyticsDashboardPage() {
             <KpiCard title="Proposals Accepted" value={ov.proposalsAccepted?.value} prev={ov.proposalsAccepted?.prev} icon="🎉" />
             <KpiCard title="Active Clients" value={ov.activeClients} icon="🏢" />
             <KpiCard title="Active Projects" value={ov.activeProjects} icon="📋" />
+          </div>
+
+          {/* ================= AI BUSINESS COMMAND CENTER ================= */}
+          <div className="rounded-xl border border-primary/30 bg-gradient-to-r from-primary/10 to-transparent p-5">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+              <div>
+                <h2 className="text-lg font-semibold font-[var(--font-heading)]">AI Business <span className="gradient-text">Command Center</span></h2>
+                <p className="text-xs text-grey">What matters most right now — every line backed by live metrics</p>
+              </div>
+              <Link href="/admin/command" className="text-xs px-3 py-1.5 rounded-lg border border-primary/40 text-primary hover:bg-primary/10">Open command center →</Link>
+            </div>
+            {!cmd ? <p className="text-sm text-grey-dark py-2">Loading command signals…</p> : (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                <div className="rounded-lg bg-bg/60 border border-border/60 p-3">
+                  <p className="text-[10px] text-grey-dark uppercase tracking-wider">📨 Yesterday</p>
+                  <p className="text-lg font-semibold mt-0.5">{cmd.yesterday.sent} <span className="text-[11px] font-normal text-grey-dark">sent → {cmd.yesterday.replies} replies</span></p>
+                </div>
+                <div className="rounded-lg bg-bg/60 border border-border/60 p-3">
+                  <p className="text-[10px] text-grey-dark uppercase tracking-wider">🚨 Attention</p>
+                  <p className="text-lg font-semibold mt-0.5">{cmd.attention} <span className="text-[11px] font-normal text-grey-dark">need you</span></p>
+                </div>
+                <div className="rounded-lg bg-bg/60 border border-border/60 p-3">
+                  <p className="text-[10px] text-grey-dark uppercase tracking-wider">🔮 Pipeline</p>
+                  <p className="text-lg font-semibold mt-0.5">₹{Number(cmd.pipeline || 0).toLocaleString("en-IN")}</p>
+                  <p className="text-[11px] text-grey-dark">{cmd.opportunities} opportunities</p>
+                </div>
+                <div className="rounded-lg bg-bg/60 border border-border/60 p-3">
+                  <p className="text-[10px] text-grey-dark uppercase tracking-wider">🎯 MRR target</p>
+                  <p className="text-lg font-semibold mt-0.5">{cmd.progress}% <span className="text-[11px] font-normal text-grey-dark">of ₹1,00,000</span></p>
+                </div>
+                <div className="rounded-lg bg-bg/60 border border-border/60 p-3 col-span-2">
+                  <p className="text-[10px] text-grey-dark uppercase tracking-wider">🔝 Top priority</p>
+                  <p className="text-xs mt-1 truncate">{cmd.top?.[0]?.title || "All clear — automation is handling everything."}</p>
+                  <p className="text-[11px] text-grey-dark mt-0.5 truncate">Bottleneck: {cmd.bottleneck}</p>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* ================= DAILY PERFORMANCE ================= */}
