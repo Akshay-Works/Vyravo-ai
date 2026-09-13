@@ -3,6 +3,7 @@ import { timingSafeEqual } from "crypto";
 import { processEmailQueue } from "@/lib/email/process";
 import { processOutreachQueue, ensureOutreachSchema } from "@/lib/outreach/pipeline";
 import { getOutreachConfig } from "@/lib/outreach/config";
+import { recordHeartbeat } from "@/lib/activity/heartbeat";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60; // Vercel Hobby limit; batch cap keeps us well inside
@@ -52,9 +53,11 @@ export async function GET(request: NextRequest) {
         outreach.auto = false;
       }
     } catch (e) { console.error("Cron outreach error:", e); }
+    await recordHeartbeat("cron_emails", "ok", { sent: outreach?.sent ?? 0, failed: outreach?.failed ?? 0, replyPolled: replyPoll?.polled ?? 0, replyApplied: replyPoll?.applied ?? 0, workflows });
     return Response.json({ ok: true, ...result, outreach, replyPoll, workflows });
   } catch (e) {
     console.error("Cron email error:", e);
+    await recordHeartbeat("cron_emails", "error", {});
     return Response.json({ error: "Failed" }, { status: 500 });
   }
 }

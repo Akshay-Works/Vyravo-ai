@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { timingSafeEqual } from "crypto";
+import { recordHeartbeat } from "@/lib/activity/heartbeat";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +42,7 @@ export async function GET(request: NextRequest) {
     );
     if (!r.ok) {
       const text = await r.text().catch(() => "");
+      await recordHeartbeat("cron_kick_engine", "error", { githubStatus: r.status });
       return Response.json({ error: `GitHub dispatch failed (${r.status})`, detail: text.slice(0, 200) }, { status: 502 });
     }
 
@@ -66,9 +68,11 @@ export async function GET(request: NextRequest) {
       funnel2 = { error: e2.message };
     }
     console.log("kick-engine funnel2:", JSON.stringify(funnel2));
+    await recordHeartbeat("cron_kick_engine", "ok", { dispatched: ENGINE_WORKFLOW_ID, funnel2 });
     return Response.json({ ok: true, dispatched: ENGINE_WORKFLOW_ID, funnel2, at: new Date().toISOString() });
   } catch (e: any) {
     console.error("kick-engine error:", e.message);
+    await recordHeartbeat("cron_kick_engine", "error", {});
     return Response.json({ error: "Failed" }, { status: 500 });
   }
 }

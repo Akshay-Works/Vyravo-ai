@@ -19,6 +19,7 @@
 import { ImapFlow } from "imapflow";
 import { pool } from "@/db";
 import { markReplied } from "./pipeline";
+import { recordHeartbeat } from "../activity/heartbeat";
 import {
   normalizeMessageId, extractReplyMessageIds, extractFromEmail,
   extractTextPreview, isThreadedReply, REPLY_WINDOW_DAYS,
@@ -102,6 +103,7 @@ export async function pollGmailReplies(opts: { windowDays?: number } = {}): Prom
   if (!imapCreds()) {
     result.reason = "no credentials — skipped (EMAIL_PASS not set)";
     console.log(`[REPLY] poll skipped: ${result.reason}`);
+    await recordHeartbeat("reply_poll", "skipped", { reason: result.reason });
     return result;
   }
   const since = new Date(Date.now() - (opts.windowDays || REPLY_WINDOW_DAYS) * 86400000);
@@ -203,6 +205,8 @@ export async function pollGmailReplies(opts: { windowDays?: number } = {}): Prom
     result.reason = short(e?.message, 200);
     console.error(`[REPLY] poll failed: ${result.reason}`);
   }
+  await recordHeartbeat("reply_poll", result.errors > 0 && result.polled === 0 ? "error" : "ok",
+    { polled: result.polled, matched: result.matched, applied: result.applied, duplicate: result.duplicate, errors: result.errors });
   return result;
 }
 

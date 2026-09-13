@@ -9,6 +9,7 @@ import { ACTIVITY_TZ, istDayBounds, outreachFunnel, todayIst } from "./events";
 import { replyIntelligence, segments, revenue, bestOutreach, rate } from "./tier2";
 import { normalizeReplyText, REPLY_CLASS_LABELS } from "./classify";
 import { getOutreachConfig } from "../outreach/config";
+import { readHeartbeats } from "./heartbeat";
 
 // Lead 402's reply state is E2E-test residue, not a real prospect reply.
 // It stays in historical counts (Tier 1/2 record what happened) but is
@@ -31,6 +32,9 @@ function snippet(subject: string | null, preview: string | null, n = 140): strin
 }
 async function cfg() {
   try { return await getOutreachConfig(); } catch { return { auto_outreach: false, daily_limit: 30 } as any; }
+}
+function hbAge(h: { last_run: string } | undefined): number | null {
+  return h?.last_run ? (Date.now() - new Date(h.last_run).getTime()) / 3600000 : null;
 }
 
 // ------------------------------------------------------- OPPORTUNITY SCORES
@@ -435,16 +439,37 @@ export async function automationHealth(): Promise<{ generated_at: string; system
     signals: [{ label: "Bounced / sent (7d)", value: `${bnc7} / ${sent7}`, ok: br < 5 }],
   });
   const seenMax = await n(`SELECT COUNT(*)::int n FROM outreach_replies_seen WHERE matched_at > now() - interval '7 days'`);
+  const rhb = await readHeartbeats(["reply_poll"]);
+  const rp = rhb["reply_poll"];
+  const rpAge = hbAge(rp);
+  const rpStatus: SysStatus = !rp ? "unknown"
+    : rp.status === "error" ? (rpAge != null && rpAge < 48 ? "warning" : "failed")
+    : rpAge != null && rpAge < 24 ? "healthy" : rpAge != null && rpAge < 48 ? "warning" : "failed";
   systems.push({
-    key: "replies", label: "Reply processing", summary: "No poll heartbeat is recorded — outcome visible, poll runs unobservable",
-    status: "unknown",
-    signals: [{ label: "Replies matched (7d)", value: String(seenMax), ok: true }, { label: "Poll heartbeat", value: "not recorded", ok: false }],
+    key: "replies", label: "Reply processing",
+    summary: !rp ? "No poll recorded yet (populates on the next poll)" : `last poll ${rpAge!.toFixed(1)}h ago · ${rp.status}${rp.detail?.applied ? ` · ${rp.detail.applied} applied` : ""}`,
+    status: rpStatus,
+    signals: [
+      { label: "Last poll", value: rp ? `${rpAge!.toFixed(1)}h ago (${rp.status})` : "never", ok: rpStatus === "healthy" },
+      { label: "Replies matched (7d)", value: String(seenMax), ok: true },
+    ],
   });
   const sent24 = await n(`SELECT COUNT(*)::int n FROM outreach_events WHERE status = 'sent' AND test_send = false AND sent_at > now() - interval '24 hours'`);
+  const chb = await readHeartbeats(["cron_emails", "cron_kick_engine"]);
+  const ce = chb["cron_emails"], ck = chb["cron_kick_engine"];
+  const ceAge = hbAge(ce), ckAge = hbAge(ck);
+  const cronStatus: SysStatus = !ce && !ck ? "unknown"
+    : (ceAge ?? 999) < 36 || (ckAge ?? 999) < 36 ? "healthy"
+    : (ceAge ?? 999) < 72 || (ckAge ?? 999) < 72 ? "warning" : "failed";
   systems.push({
-    key: "cron", label: "Scheduled jobs", summary: sent24 > 0 ? `sender produced ${sent24} sends in 24h (no direct cron heartbeat)` : "no sends in 24h (no direct cron heartbeat)",
-    status: sent24 > 0 ? "healthy" : "unknown",
-    signals: [{ label: "Sends 24h", value: String(sent24), ok: sent24 > 0 }, { label: "Cron heartbeat", value: "not recorded", ok: false }],
+    key: "cron", label: "Scheduled jobs",
+    summary: !ce && !ck ? "No cron run recorded yet (populates on the next scheduled run)" : `emails ${ce ? ceAge!.toFixed(1) + "h ago" : "never"} · kick ${ck ? ckAge!.toFixed(1) + "h ago" : "never"}`,
+    status: cronStatus,
+    signals: [
+      { label: "cron/emails", value: ce ? `${ceAge!.toFixed(1)}h ago (${ce.status})` : "never", ok: (ceAge ?? 999) < 36 },
+      { label: "cron/kick-engine", value: ck ? `${ckAge!.toFixed(1)}h ago (${ck.status})` : "never", ok: (ckAge ?? 999) < 36 },
+      { label: "Sends 24h", value: String(sent24), ok: sent24 > 0 },
+    ],
   });
   const withId = await n(`SELECT COUNT(*)::int n FROM outreach_events WHERE status = 'sent' AND test_send = false AND resend_id IS NOT NULL AND sent_at > now() - interval '7 days'`);
   systems.push({
