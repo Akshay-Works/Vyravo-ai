@@ -20,7 +20,7 @@ export function dateClause(filter: DateFilter, column: any, defaultFrom?: string
   let from: Date;
   let to: Date = filter.to ? new Date(filter.to) : now;
   if (filter.period === "today") { from = new Date(now.getFullYear(), now.getMonth(), now.getDate()); }
-  else if (filter.period === "yesterday") { const y = new Date(now); y.setDate(y.getDate() - 1); from = new Date(y.getFullYear(), y.getMonth(), y.getDate()); to = from; }
+  else if (filter.period === "yesterday") { const y = new Date(now); y.setDate(y.getDate() - 1); from = new Date(y.getFullYear(), y.getMonth(), y.getDate()); to = new Date(now.getFullYear(), now.getMonth(), now.getDate()); }
   else if (filter.period === "7d") { from = new Date(now.getTime() - 7 * 86400000); }
   else if (filter.period === "30d" || !filter.period) { from = new Date(now.getTime() - 30 * 86400000); }
   else if (filter.period === "month") { from = new Date(now.getFullYear(), now.getMonth(), 1); }
@@ -99,7 +99,7 @@ function getPreviousPeriod(filter: DateFilter): { from: Date; to: Date } {
   let from: Date;
   let to: Date;
   switch (filter.period) {
-    case "today": { from = new Date(now); from.setDate(from.getDate() - 1); to = new Date(from); break; }
+    case "today": { from = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1); to = new Date(now.getFullYear(), now.getMonth(), now.getDate()); break; }
     case "yesterday": { from = new Date(now); from.setDate(from.getDate() - 2); to = new Date(from); to.setDate(to.getDate() + 1); break; }
     case "7d": { from = new Date(now.getTime() - 14 * 86400000); to = new Date(now.getTime() - 7 * 86400000); break; }
     case "30d": { from = new Date(now.getTime() - 60 * 86400000); to = new Date(now.getTime() - 30 * 86400000); break; }

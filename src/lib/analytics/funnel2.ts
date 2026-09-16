@@ -14,15 +14,18 @@ function dayFilter(filter: DateFilter, column = "date_discovered"): { sql: strin
   if (!filter || filter.period === "all" || filter.period === undefined) return { sql: "", params: [] };
   const now = new Date();
   let from: Date;
+  let to: Date | null = null;
   if (filter.period === "today") from = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  else if (filter.period === "yesterday") { from = new Date(now); from.setDate(from.getDate() - 1); from = new Date(from.getFullYear(), from.getMonth(), from.getDate()); }
+  else if (filter.period === "yesterday") { from = new Date(now); from.setDate(from.getDate() - 1); from = new Date(from.getFullYear(), from.getMonth(), from.getDate()); to = new Date(now.getFullYear(), now.getMonth(), now.getDate()); }
   else if (filter.period === "7d") from = new Date(now.getTime() - 7 * 86400000);
   else if (filter.period === "month") from = new Date(now.getFullYear(), now.getMonth(), 1);
   else if (filter.period === "quarter") from = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1);
   else if (filter.period === "year") from = new Date(now.getFullYear(), 0, 1);
   else from = new Date(now.getTime() - 30 * 86400000); // 30d default
   if (filter.from) from = new Date(filter.from);
-  return { sql: `${column} >= $1::date`, params: [from.toISOString().slice(0, 10)] };
+  const fromStr = from.toISOString().slice(0, 10);
+  if (to && !filter.to) return { sql: `${column} >= $1::date AND ${column} < $2::date`, params: [fromStr, to.toISOString().slice(0, 10)] };
+  return { sql: `${column} >= $1::date`, params: [fromStr] };
 }
 
 // ---------------------------------------------------------------------------
