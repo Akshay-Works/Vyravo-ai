@@ -131,6 +131,22 @@ export default function OutreachPage() {
     finally { setBusy(false); }
   };
 
+  const overflowNow = async (send: string) => {
+    if (!confirm(send === "1"
+      ? "Trigger the CircleCI engine overflow WITH sending? (runs the 3 engine jobs now; outreach hooks will queue AND send)"
+      : "Trigger a CircleCI overflow TEST? (runs the 3 engine jobs now; outreach hooks will queue WITHOUT sending)")) return;
+    setBusy(true); setMsg("");
+    try {
+      const r = await fetch("/api/admin/outreach/circleci-overflow", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ send }),
+      });
+      const d = await r.json();
+      setMsg(d.ok ? `✓ CircleCI overflow #${d.pipeline} triggered (${send === "1" ? "send ON" : "queue-only test"}) — jobs take ~20–40 min; watch the CircleCI dashboard` : (d.error || "Overflow failed"));
+    } catch { setMsg("Network error"); }
+    finally { setBusy(false); }
+  };
+
   const pollNow = async () => {
     setBusy(true); setMsg("");
     try {
@@ -173,6 +189,12 @@ export default function OutreachPage() {
           </button>
           <button onClick={pollNow} disabled={busy} className="rounded-lg border border-emerald-500/40 px-3 py-1.5 text-xs text-emerald-400 hover:bg-emerald-500/10 disabled:opacity-50">
             ✉ Check inbox for replies
+          </button>
+          <button onClick={() => overflowNow("0")} disabled={busy} title="Run the 3 engine jobs on CircleCI now (queue only, no sends) — use when GitHub is quota-blocked" className="rounded-lg border border-violet-500/40 px-3 py-1.5 text-xs text-violet-400 hover:bg-violet-500/10 disabled:opacity-50">
+            ☁ Overflow test
+          </button>
+          <button onClick={() => overflowNow("1")} disabled={busy} title="Run the 3 engine jobs on CircleCI now (queue AND send, like GitHub)" className="rounded-lg border border-violet-500/40 px-3 py-1.5 text-xs text-violet-400 hover:bg-violet-500/10 disabled:opacity-50">
+            ☁ Overflow + send
           </button>
           <button onClick={load} className="rounded-lg border border-border px-3 py-1.5 text-xs text-grey hover:text-white disabled:opacity-50" disabled={loading}>
             Refresh

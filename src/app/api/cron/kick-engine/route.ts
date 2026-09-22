@@ -68,8 +68,43 @@ export async function GET(request: NextRequest) {
       funnel2 = { error: e2.message };
     }
     console.log("kick-engine funnel2:", JSON.stringify(funnel2));
-    await recordHeartbeat("cron_kick_engine", "ok", { dispatched: ENGINE_WORKFLOW_ID, funnel2 });
-    return Response.json({ ok: true, dispatched: ENGINE_WORKFLOW_ID, funnel2, at: new Date().toISOString() });
+    // ---- CIRCLECI OVERFLOW WATCHDOG (never fatal) -----------------------
+    // If any engine workflow missed SUCCESS yesterday (quota exhaustion,
+    // outage, …), run the same jobs on CircleCI so leads keep flowing.
+    // Dormant when GitHub is healthy.
+    let overflow: any = { checked: false };
+    try {
+      const { githubEngineSuccessYesterday, triggerCircleCIOverflow, OVERFLOW_WORKFLOWS } =
+        await import("@/lib/outreach/circleci-overflow");
+      const y = await githubEngineSuccessYesterday(ghToken);
+      overflow = { checked: y.ok, date: y.date, github: y.success };
+      if (!y.ok) {
+        overflow.check = y.error;
+      } else {
+        const missing = OVERFLOW_WORKFLOWS.filter((w) => !y.success[w.param]).map((w) => w.param);
+        if (missing.length === 0) {
+          overflow.overflow = { skipped: "github healthy" };
+        } else {
+          const cci = (process.env.CIRCLECI_API_TOKEN || "").trim();
+          if (!cci) {
+            overflow.overflow = { skipped: "CIRCLECI_API_TOKEN not set", missing };
+          } else {
+            const t = await triggerCircleCIOverflow(cci, {
+              run_daily: missing.includes("run_daily"),
+              run_funnel2: missing.includes("run_funnel2"),
+              run_foreign: missing.includes("run_foreign"),
+              send: "1",
+            });
+            overflow.overflow = { missing, ...t };
+          }
+        }
+      }
+    } catch (e: any) {
+      overflow = { checked: false, error: String(e?.message || e).slice(0, 120) };
+    }
+    console.log("kick-engine overflow:", JSON.stringify(overflow));
+    await recordHeartbeat("cron_kick_engine", "ok", { dispatched: ENGINE_WORKFLOW_ID, funnel2, overflow });
+    return Response.json({ ok: true, dispatched: ENGINE_WORKFLOW_ID, funnel2, overflow, at: new Date().toISOString() });
   } catch (e: any) {
     console.error("kick-engine error:", e.message);
     await recordHeartbeat("cron_kick_engine", "error", {});
