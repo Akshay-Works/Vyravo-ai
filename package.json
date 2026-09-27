@@ -8,6 +8,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test:intel": "tsx scripts/test-email-intel.ts",
+    "test:sales": "tsx scripts/test-sales.ts",
     "kb:setup": "tsx scripts/kb-setup.ts",
     "kb:reembed": "tsx scripts/kb-reembed.ts",
     "proposal:setup": "tsx scripts/proposal-setup.ts",

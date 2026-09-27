@@ -272,6 +272,10 @@ export async function generateAndQueue(cfg: OutreachConfig, opts: { leadId?: num
   const processLead = async (lead: any, followUpNumber: number) => {
     const email = String(lead.email || "").trim();
     if (!email || !EMAIL_RE.test(email)) { skipped.push(`#${lead.id} invalid email`); return; }
+    try {
+      const { isSuppressed } = await import("../sales/schema");
+      if (await isSuppressed(email)) { skipped.push(`#${lead.id} suppressed`); return; }
+    } catch { /* suppression check failure: fail open (queue), logged by helper */ }
     const html = await buildOutreachEmail(lead, followUpNumber);
     const ins = await pool.query(
       `INSERT INTO outreach_events (lead_id, recipient_email, subject, body, follow_up_number, status, queued_at)
@@ -380,8 +384,17 @@ async function domainHasMx(email: string): Promise<"ok" | "bad" | "unknown"> {
 // ---------------------------------------------------------------------------
 // SEND — controlled, rate-limited, limit-capped, test-mode aware
 // ---------------------------------------------------------------------------
-export async function processOutreachQueue(cfg: OutreachConfig): Promise<{ sent: number; failed: number; skipped: number; capped: boolean; truncated: boolean; batchCap: number; testMode: boolean }> {
+export async function processOutreachQueue(cfg: OutreachConfig): Promise<{ sent: number; failed: number; skipped: number; capped: boolean; truncated: boolean; batchCap: number; testMode: boolean; paused?: boolean; pauseReason?: string }> {
   await ensureOutreachSchema();
+  // Sales OS: global pause + reputation guard — checked once per run.
+  try {
+    const { isSalesPaused } = await import("../sales/schema");
+    const gate = await isSalesPaused();
+    if (gate.paused) {
+      console.log(`[SEND] SALES_PAUSED — sending halted: ${gate.reason}`);
+      return { sent: 0, failed: 0, skipped: 0, capped: false, truncated: false, batchCap: 0, testMode: cfg.test_mode, paused: true, pauseReason: gate.reason || undefined };
+    }
+  } catch { /* guard failure must not halt sending — fail open, logged below */ }
   const rows = await pool.query(
     `SELECT q.* FROM email_queue q
      WHERE q.status = 'pending' AND q.scheduled_for <= now()
@@ -441,13 +454,25 @@ export async function processOutreachQueue(cfg: OutreachConfig): Promise<{ sent:
     // FRESH CHECK (immediately before sending — never rely on when the
     // follow-up was scheduled): if the lead replied or is closed, do not send.
     if (leadId) {
-      const lead = await pool.query(`SELECT status, reply_received FROM leads WHERE id = $1`, [leadId]);
+      const lead = await pool.query(`SELECT status, reply_received, email FROM leads WHERE id = $1`, [leadId]);
       if ((lead.rowCount ?? 0) === 0) {
         await pool.query(`UPDATE email_queue SET status = 'skipped' WHERE id = $1`, [row.id]);
         await pool.query(`UPDATE outreach_events SET status = 'cancelled' WHERE id = $1`, [eventId]);
         skipped++;
         continue;
       }
+      // Sales OS: suppression re-check immediately before sending.
+      const leadEmail = String(lead.rows[0].email || "");
+      try {
+        const { isSuppressed } = await import("../sales/schema");
+        if (leadEmail && await isSuppressed(leadEmail)) {
+          await pool.query(`UPDATE email_queue SET status = 'skipped' WHERE id = $1`, [row.id]);
+          await pool.query(`UPDATE outreach_events SET status = 'cancelled' WHERE id = $1 AND status = 'queued'`, [eventId]);
+          skipped++;
+          console.log(`[SEND] SUPPRESSED_SKIPPED lead=${leadId} event=${eventId} queue=${row.id}`);
+          continue;
+        }
+      } catch { /* fail open */ }
       if (lead.rows[0].reply_received || BLOCKED_STATUSES.includes(String(lead.rows[0].status))) {
         await pool.query(`UPDATE email_queue SET status = 'skipped' WHERE id = $1`, [row.id]);
         await pool.query(`UPDATE outreach_events SET status = 'cancelled' WHERE id = $1 AND status = 'queued'`, [eventId]);
@@ -510,6 +535,13 @@ export async function processOutreachQueue(cfg: OutreachConfig): Promise<{ sent:
            WHERE id = $1`,
           [leadId, delay != null ? new Date(Date.now() + delay * 86400000) : null, fn]
         );
+        // Sales OS: first outreach sent → CONTACTED stage (best-effort).
+        if (fn === 0) {
+          try {
+            const { advanceStage } = await import("../sales/stages");
+            await advanceStage(leadId, "contacted", "first outreach sent", { trigger: "processOutreachQueue" });
+          } catch { /* stage move must never break sending */ }
+        }
       }
       sent++;
       console.log(`[SEND] EMAIL_SENT lead=${leadId} event=${eventId} queue=${row.id} followup=${data.followUpNumber || 0} provider=${result.provider} id=${String((result as any).id || "").slice(0, 48)}`);
@@ -687,6 +719,11 @@ export async function markReplied(leadId: number, meta: ReplyMeta = {}): Promise
   } catch { /* activities table may not exist on some installs — non-fatal */ }
 
   console.log(`[REPLY] REPLY_RECEIVED lead=${leadId} first=${firstReply} msg=${String(normId || "").slice(0, 60)}`);
+  // Sales OS: a reply means ENGAGED (best-effort, never blocks the poller).
+  try {
+    const { advanceStage } = await import("../sales/stages");
+    await advanceStage(leadId, "engaged", "prospect replied", { trigger: "markReplied" });
+  } catch { /* stage move must never break reply handling */ }
   if (firstReply) {
     console.log(`[REPLY] REPLY_MATCHED_TO_LEAD lead=${leadId} — follow-ups cancelled, status=replied`);
     // speed-to-lead: ping the owner immediately (fire-and-forget, never blocks)

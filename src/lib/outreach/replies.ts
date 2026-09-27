@@ -175,6 +175,15 @@ export async function pollGmailReplies(opts: { windowDays?: number } = {}): Prom
                   [threadIds]
                 );
                 console.log(`[REPLY] BOUNCE_DETECTED lead=${leadId} msg=${short(messageId)} failed_events=${ups.rowCount ?? 0}`);
+                // Sales OS: bounced addresses join the suppression list (never mailed again).
+                try {
+                  const { addSuppression } = await import("@/lib/sales/schema");
+                  const recips = await pool.query(
+                    `SELECT DISTINCT recipient_email FROM outreach_events WHERE resend_id = ANY($1::text[])`, [threadIds]);
+                  for (const rr of recips.rows as any[]) {
+                    if (rr.recipient_email) await addSuppression(rr.recipient_email, "bounced (provider)", "reply-poller");
+                  }
+                } catch { /* suppression must never break the poller */ }
               } else {
                 console.log(`[REPLY] ${kind === "autoreply" ? "AUTOREPLY_IGNORED" : "TRANSIENT_DELAY_IGNORED"} lead=${leadId} msg=${short(messageId)}`);
               }

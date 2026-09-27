@@ -84,6 +84,12 @@ export async function processInboxTick(opts: TickOpts = {}): Promise<TickSummary
     if (Date.now() - t0 > budget) { sum.truncated = true; break; }
     try {
       const action = await processOne(msg, cfg, !!opts.forceDraft);
+      // Sales OS: pipeline decision (stage move / escalation) for every processed message.
+      try {
+        const { decideForInbox } = await import("@/lib/sales/decide");
+        const fresh = (await pool.query(`SELECT lead_id, classification, confidence FROM inbox_messages WHERE id = $1`, [msg.id])).rows[0];
+        if (fresh) await decideForInbox({ lead_id: fresh.lead_id, classification: fresh.classification, confidence: fresh.confidence, actionTaken: action });
+      } catch { /* decision failure must never break the tick */ }
       if (action === "send") sum.sent++;
       else if (action === "draft") sum.drafted++;
       else if (action === "needs_review") sum.review++;
@@ -170,6 +176,13 @@ async function processOne(msg: any, cfg: Awaited<ReturnType<typeof getInboxConfi
   });
   let action = decision.action;
   if (forceDraft && action === "send") { action = "draft"; decision.reasons.push("production-safe mode: forced draft"); }
+  if (action === "send") {
+    try {
+      const { isSalesPaused } = await import("@/lib/sales/schema");
+      const gate = await isSalesPaused();
+      if (gate.paused) { action = "draft"; decision.reasons.push(`sales paused — draft only (${gate.reason})`); }
+    } catch { /* guard failure: fail open (send), router already approved */ }
+  }
 
   await pool.query(
     `UPDATE inbox_messages SET classification = $2, confidence = $3, reply_required = $4,

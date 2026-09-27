@@ -61,8 +61,16 @@ export async function GET(request: NextRequest) {
     } catch (e: any) {
       inbox = { claimed: 0, error: String(e?.message || e).slice(0, 160) };
     }
-    await recordHeartbeat("cron_emails", "ok", { sent: outreach?.sent ?? 0, failed: outreach?.failed ?? 0, replyPolled: replyPoll?.polled ?? 0, replyApplied: replyPoll?.applied ?? 0, inbox, workflows });
-    return Response.json({ ok: true, ...result, outreach, replyPoll, inbox, workflows });
+    // Sales OS sweep — bounded; never breaks the cron.
+    let sales: any = { nurtured: 0 };
+    try {
+      const { salesTick } = await import("@/lib/sales/decide");
+      sales = await salesTick({ max: 25, budgetMs: 10000 });
+    } catch (e: any) {
+      sales = { nurtured: 0, error: String(e?.message || e).slice(0, 160) };
+    }
+    await recordHeartbeat("cron_emails", "ok", { sent: outreach?.sent ?? 0, failed: outreach?.failed ?? 0, replyPolled: replyPoll?.polled ?? 0, replyApplied: replyPoll?.applied ?? 0, inbox, sales, workflows });
+    return Response.json({ ok: true, ...result, outreach, replyPoll, inbox, sales, workflows });
   } catch (e) {
     console.error("Cron email error:", e);
     await recordHeartbeat("cron_emails", "error", {});
