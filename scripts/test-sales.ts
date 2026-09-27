@@ -63,6 +63,46 @@ async function main() {
   await pool.query(`UPDATE leads SET stage = $1 WHERE id = 402`, [before]);
   console.log(`  (lead 402 stage restored to ${before})`);
 
+  console.log("legacy stage map");
+  ok("QUALIFIED→qualified", normalizeStage("QUALIFIED") === "qualified");
+  ok("READY→researched", normalizeStage("READY_FOR_OUTREACH") === "researched");
+  ok("archived→lost (terminal)", normalizeStage("archived") === "lost" && !canTransition("archived", "contacted"));
+
+  console.log("score (pure)");
+  {
+    const { computeScore, bandFor } = await import("@/lib/sales/score");
+    const hot = computeScore({ industry: "Dental Clinic", country: "India", business_website: "https://x.com", phone: "123",
+      email: "dr@clinic.com", full_name: "Rohan Mehta", reply_received: true, reply_class: "pricing_request",
+      sent_count: 2, inbox_threads: 1, last_activity_at: new Date().toISOString() });
+    ok("hot lead scores high", hot.score >= 61 && ["high", "immediate"].includes(hot.band), `${hot.score}/${hot.band}`);
+    const cold = computeScore({ email: "info@unknown" });
+    ok("thin lead scores low", cold.score <= 40, `${cold.score}/${cold.band}`);
+    const ref = computeScore({ industry: "Restaurant", email: "a@b.com", source: "Referral" });
+    const noref = computeScore({ industry: "Restaurant", email: "a@b.com", source: "engine" });
+    ok("referral bonus", ref.score === noref.score + 10, `${ref.score} vs ${noref.score}`);
+    ok("bands", bandFor(85) === "immediate" && bandFor(61) === "high" && bandFor(41) === "moderate" && bandFor(21) === "low" && bandFor(5) === "very low");
+  }
+  console.log("qualify (pure)");
+  {
+    const { extractBuyingSignals } = await import("@/lib/sales/qualify");
+    const s = extractBuyingSignals("I own a dental clinic. What's the pricing? Our budget is around ₹50,000 and we want to start next month.");
+    ok("budget extracted", !!s.budget && s.budget.includes("50,000"), s.budget || "");
+    ok("timeline extracted", !!s.timeline, s.timeline || "");
+    ok("owner detected", s.authority === "decision_maker", s.authority);
+    ok("intent high", s.intent >= 2, String(s.intent));
+    const s2 = extractBuyingSignals("Thanks, I need to check with my team.");
+    ok("team + low intent", s2.authority === "team" && s2.intent < 2, `${s2.authority}/${s2.intent}`);
+  }
+  console.log("research extract (pure)");
+  {
+    const { extractSignals } = await import("@/lib/sales/research");
+    const sig = extractSignals(`<html><head><title>Smile Dental</title><meta name="description" content="Best dental care"></head>
+      <body><a href="https://wa.me/123">chat</a><a href="tel:+9111">call</a><form></form><script src="https://tawk.to/x"></script>contact@smile.com</body></html>`, "https://smile.com");
+    ok("chatbot/wa/form/phone", sig.has_chatbot && sig.has_whatsapp && sig.has_lead_form && sig.has_phone);
+    ok("no booking", !sig.has_booking);
+    ok("title+desc+email", sig.title === "Smile Dental" && (sig.description || "").includes("dental") && sig.emails_found.includes("contact@smile.com"));
+  }
+
   console.log("salesTick (live sweep, max 3)");
   const t = await salesTick({ max: 3, budgetMs: 10000 });
   ok("tick ran", typeof t.nurtured === "number", JSON.stringify(t));

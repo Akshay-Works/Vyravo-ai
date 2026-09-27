@@ -89,6 +89,10 @@ export async function processInboxTick(opts: TickOpts = {}): Promise<TickSummary
         const { decideForInbox } = await import("@/lib/sales/decide");
         const fresh = (await pool.query(`SELECT lead_id, classification, confidence FROM inbox_messages WHERE id = $1`, [msg.id])).rows[0];
         if (fresh) await decideForInbox({ lead_id: fresh.lead_id, classification: fresh.classification, confidence: fresh.confidence, actionTaken: action });
+        if (fresh?.lead_id) {
+          const { qualifyFromThread } = await import("@/lib/sales/qualify");
+          await qualifyFromThread(Number(fresh.lead_id));
+        }
       } catch { /* decision failure must never break the tick */ }
       if (action === "send") sum.sent++;
       else if (action === "draft") sum.drafted++;

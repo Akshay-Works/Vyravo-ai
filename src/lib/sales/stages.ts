@@ -20,9 +20,16 @@ export type SalesStage = (typeof ALL_STAGES)[number];
 
 const ORDER = new Map<string, number>(ACTIVE_STAGES.map((s, i) => [s, i]));
 
+/** Legacy CRM values → canonical stages. Never regress automation state. */
+const LEGACY_MAP: Record<string, string> = {
+  ready_for_outreach: "researched",
+  archived: "lost", // archived = dead in legacy CRM → terminal, automation stops
+};
+
 export function normalizeStage(raw: any): string {
   const s = String(raw || "new").toLowerCase().trim();
-  return (ALL_STAGES as readonly string[]).includes(s) ? s : "new";
+  if ((ALL_STAGES as readonly string[]).includes(s)) return s;
+  return LEGACY_MAP[s] || "new";
 }
 
 export function isTerminal(stage: string): boolean {

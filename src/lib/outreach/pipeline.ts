@@ -331,6 +331,8 @@ export async function scheduleFollowUps(cfg: OutreachConfig): Promise<number> {
          AND e0.sent_at + ($2::text || ' days')::interval <= now()
          AND COALESCE(l.status, 'active') NOT IN (${BLOCKED_STATUSES.map((_, i) => `$${i + 3}`).join(",")})
          AND COALESCE(l.reply_received, false) = false
+         AND COALESCE(l.stage, 'new') NOT IN ('not_interested','wrong_contact','unqualified','lost','no_response','nurture','archived')
+         AND NOT EXISTS (SELECT 1 FROM suppression_list s WHERE s.email = lower(e.recipient_email))
          AND NOT EXISTS (SELECT 1 FROM outreach_events e2 WHERE e2.lead_id = e.lead_id AND e2.follow_up_number = $1 + 1)
        LIMIT 100`,
       [n, days[n], ...BLOCKED_STATUSES]

@@ -74,7 +74,7 @@ export async function decideForInbox(msg: {
  * + re-engagement date +30d. Never touches replied/blocked leads.
  */
 export async function salesTick(opts: { max?: number; budgetMs?: number } = {}): Promise<{
-  nurtured: number; open_escalations: number; truncated: boolean;
+  nurtured: number; open_escalations: number; truncated: boolean; rescored: number; scoreChanged: number;
 }> {
   const max = Math.min(Math.max(opts.max || 25, 1), 100);
   const t0 = Date.now();
@@ -101,5 +101,11 @@ export async function salesTick(opts: { max?: number; budgetMs?: number } = {}):
     } catch {}
   }
   const open = await pool.query(`SELECT count(*)::int n FROM sales_escalations WHERE status = 'open'`);
-  return { nurtured, open_escalations: Number(open.rows[0]?.n || 0), truncated: (cands.rowCount ?? 0) >= max };
+  let rescored = 0, scoreChanged = 0;
+  try {
+    const { rescoreTick } = await import("./score");
+    const r = await rescoreTick({ max: 50 });
+    rescored = r.rescored; scoreChanged = r.changed;
+  } catch {}
+  return { nurtured, open_escalations: Number(open.rows[0]?.n || 0), truncated: (cands.rowCount ?? 0) >= max, rescored, scoreChanged };
 }

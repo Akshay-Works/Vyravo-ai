@@ -69,8 +69,16 @@ export async function GET(request: NextRequest) {
     } catch (e: any) {
       sales = { nurtured: 0, error: String(e?.message || e).slice(0, 160) };
     }
-    await recordHeartbeat("cron_emails", "ok", { sent: outreach?.sent ?? 0, failed: outreach?.failed ?? 0, replyPolled: replyPoll?.polled ?? 0, replyApplied: replyPoll?.applied ?? 0, inbox, sales, workflows });
-    return Response.json({ ok: true, ...result, outreach, replyPoll, inbox, sales, workflows });
+    // Sales OS research — bounded website enrichment; never breaks the cron.
+    let research: any = { researched: 0 };
+    try {
+      const { researchTick } = await import("@/lib/sales/research");
+      research = await researchTick({ max: 3, budgetMs: 15000 });
+    } catch (e: any) {
+      research = { researched: 0, error: String(e?.message || e).slice(0, 160) };
+    }
+    await recordHeartbeat("cron_emails", "ok", { sent: outreach?.sent ?? 0, failed: outreach?.failed ?? 0, replyPolled: replyPoll?.polled ?? 0, replyApplied: replyPoll?.applied ?? 0, inbox, sales, research, workflows });
+    return Response.json({ ok: true, ...result, outreach, replyPoll, inbox, sales, research, workflows });
   } catch (e) {
     console.error("Cron email error:", e);
     await recordHeartbeat("cron_emails", "error", {});
