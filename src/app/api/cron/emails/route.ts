@@ -53,8 +53,16 @@ export async function GET(request: NextRequest) {
         outreach.auto = false;
       }
     } catch (e) { console.error("Cron outreach error:", e); }
-    await recordHeartbeat("cron_emails", "ok", { sent: outreach?.sent ?? 0, failed: outreach?.failed ?? 0, replyPolled: replyPoll?.polled ?? 0, replyApplied: replyPoll?.applied ?? 0, workflows });
-    return Response.json({ ok: true, ...result, outreach, replyPoll, workflows });
+    // Inbox intelligence tick — bounded, DB-backed; never breaks the cron.
+    let inbox: any = { claimed: 0 };
+    try {
+      const { processInboxTick } = await import("@/lib/email-intel/process");
+      inbox = await processInboxTick({ maxMessages: 8, budgetMs: 20000 });
+    } catch (e: any) {
+      inbox = { claimed: 0, error: String(e?.message || e).slice(0, 160) };
+    }
+    await recordHeartbeat("cron_emails", "ok", { sent: outreach?.sent ?? 0, failed: outreach?.failed ?? 0, replyPolled: replyPoll?.polled ?? 0, replyApplied: replyPoll?.applied ?? 0, inbox, workflows });
+    return Response.json({ ok: true, ...result, outreach, replyPoll, inbox, workflows });
   } catch (e) {
     console.error("Cron email error:", e);
     await recordHeartbeat("cron_emails", "error", {});

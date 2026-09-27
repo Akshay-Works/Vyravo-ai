@@ -20,7 +20,14 @@ export async function POST(request: NextRequest) {
       const { pollGmailReplies, backfillSentMessageIds } = await import("@/lib/outreach/replies");
       const replyPoll = await pollGmailReplies();
       const bf = await backfillSentMessageIds();
-      return Response.json({ ok: true, replyPoll, backfilled: bf.backfilled || 0 });
+      let inbox: any = { claimed: 0 };
+      try {
+        const { processInboxTick } = await import("@/lib/email-intel/process");
+        inbox = await processInboxTick({ maxMessages: 8, budgetMs: 20000 });
+      } catch (e: any) {
+        inbox = { claimed: 0, error: String(e?.message || e).slice(0, 160) };
+      }
+      return Response.json({ ok: true, replyPoll, backfilled: bf.backfilled || 0, inbox });
     }
     const result = await runOutreachPipeline({ send });
     return Response.json({ ok: true, ...result });

@@ -185,6 +185,19 @@ export async function pollGmailReplies(opts: { windowDays?: number } = {}): Prom
               continue;
             }
 
+            // ---- email intelligence sync (before markReplied: replies_seen
+            // distinguishes pre-system mail from new mail needing the AI) ----
+            if (leadId != null) {
+              try {
+                const { syncInboundMessage } = await import("@/lib/email-intel/process");
+                await syncInboundMessage({
+                  messageId, threadIds, leadId,
+                  fromHeader: headers.from || "", toHeader: headers.to || "", ccHeader: headers.cc || "",
+                  subject, source, date: headers.date || null,
+                });
+              } catch { /* sync must never break the reply poller */ }
+            }
+
             result.matched++;
             console.log(`[REPLY] REPLY_RECEIVED lead=${leadId} msg=${short(messageId)} from=${short(fromEmail)} subject=${short(subject)}`);
             const applied = await markReplied(leadId, {

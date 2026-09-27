@@ -16,6 +16,7 @@ export interface EmailOptions {
   html?: string;
   text?: string;
   replyTo?: string;
+  headers?: Record<string, string>; // e.g. In-Reply-To/References for threaded replies
 }
 
 // Outbound emails are ALWAYS addressed to the selected lead/client.
@@ -57,6 +58,7 @@ export async function sendEmail(options: EmailOptions): Promise<{ sent: boolean;
           html: options.html || options.text,
           text: options.text || options.html?.replace(/<[^>]*>/g, ""),
           reply_to: options.replyTo || DEFAULT_REPLY_TO,
+          ...(options.headers ? { headers: options.headers } : {}),
         }),
         signal: AbortSignal.timeout(10000),
       });
@@ -82,6 +84,7 @@ export async function sendEmail(options: EmailOptions): Promise<{ sent: boolean;
       html: options.html || options.text,
       text: options.text || options.html?.replace(/<[^>]*>/g, ""),
       replyTo: options.replyTo || DEFAULT_REPLY_TO,
+      ...(options.headers ? { headers: options.headers } : {}),
     });
     // nodemailer returns the provider Message-ID — this is the key that lets
     // the IMAP reply poller match a reply (In-Reply-To/References) to the lead.
