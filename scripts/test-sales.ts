@@ -108,6 +108,45 @@ async function main() {
   ok("tick ran", typeof t.nurtured === "number", JSON.stringify(t));
   console.log(`  nurtured=${t.nurtured} open_escalations=${t.open_escalations}`);
 
+  console.log("brief (read-only)");
+  {
+    const { buildDiscoveryBrief } = await import("@/lib/sales/brief");
+    const brief = await buildDiscoveryBrief(402);
+    ok("has all sections", ["DISCOVERY BRIEF", "Company:", "Contact:", "Conversation history:", "Questions to ask:", "Desired outcome:"].every((s) => brief.includes(s)));
+  }
+  console.log("negotiate (pure)");
+  {
+    const { extractRequestedPrice } = await import("@/lib/sales/negotiate");
+    ok("₹50,000", extractRequestedPrice("can you do it for ₹50,000?")?.amount === 50000);
+    ok("1.5 lakh", extractRequestedPrice("budget is 1.5 lakh")?.amount === 150000);
+    ok("$2k", extractRequestedPrice("how about $2k")?.amount === 2000);
+    ok("no money → null", extractRequestedPrice("sounds interesting, tell me more") === null);
+  }
+  console.log("meetingTick (graceful without token)");
+  {
+    const { meetingTick } = await import("@/lib/sales/meetings");
+    const m = await meetingTick({ max: 2 });
+    ok("skips cleanly", m.booked === 0 && !!m.skipped, m.skipped || "");
+  }
+  console.log("proposal draft (live, cleaned)");
+  {
+    try {
+      const { generateSalesProposal } = await import("@/lib/sales/deals");
+      const p = await generateSalesProposal(402, { requirements: ["test requirement"], services: ["AI receptionist"], notes: "test-sales cleanup candidate" });
+      const row = (await pool.query(`SELECT status, generated_by_ai FROM proposals WHERE id = $1`, [p.proposalId])).rows[0];
+      ok("draft created, AI-flagged", row?.status === "draft" && row?.generated_by_ai === true, `${row?.status}/${row?.generated_by_ai}`);
+      await pool.query(`DELETE FROM proposal_events WHERE proposal_id = $1`, [p.proposalId]);
+      await pool.query(`DELETE FROM proposal_items WHERE proposal_id = $1`, [p.proposalId]);
+      await pool.query(`DELETE FROM proposal_versions WHERE proposal_id = $1`, [p.proposalId]);
+      await pool.query(`DELETE FROM proposals WHERE id = $1`, [p.proposalId]);
+      await pool.query(`DELETE FROM sales_escalations WHERE kind = 'proposal_approval' AND lead_id = 402`);
+      await pool.query(`DELETE FROM sales_decisions WHERE lead_id = 402 AND trigger_text = 'generateSalesProposal'`);
+      console.log("  (draft proposal cleaned up)");
+    } catch (e: any) {
+      console.log(`  SKIP (needs OpenAI/KB access): ${String(e?.message || e).slice(0, 120)}`);
+    }
+  }
+
   await pool.end();
   console.log(`\nRESULT: ${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);

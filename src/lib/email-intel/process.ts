@@ -188,6 +188,11 @@ async function processOne(msg: any, cfg: Awaited<ReturnType<typeof getInboxConfi
     } catch { /* guard failure: fail open (send), router already approved */ }
   }
 
+  // Sales OS: meeting requests always carry the booking link (L1 scheduling).
+  if (llm?.classification === "meeting_request" && llm.draft && !/calendly\.com|cal\.com/i.test(llm.draft.body)) {
+    const { SALES_CALENDAR_URL } = await import("@/lib/sales/meetings");
+    llm.draft.body = `${llm.draft.body.trim()}\n\nYou can choose a time that works for you here: ${SALES_CALENDAR_URL}`;
+  }
   await pool.query(
     `UPDATE inbox_messages SET classification = $2, confidence = $3, reply_required = $4,
         ai_reply_subject = $5, ai_reply_body = $6, ai_confidence = $7, processed_at = now()

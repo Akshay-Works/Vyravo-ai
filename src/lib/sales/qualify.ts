@@ -51,6 +51,17 @@ export async function qualifyFromThread(leadId: number): Promise<BuyingSignals |
     if (qualified) {
       try { await advanceStage(leadId, "qualified", `buying signals: intent ${sig.intent}/3, ${sig.authority}`, { trigger: "qualifyFromThread" }); } catch {}
     }
+    // Negotiation watch: budget talk + open proposal = founder decision (L3).
+    if (sig.budget) {
+      try {
+        const hasProp = Number((await pool.query(
+          `SELECT count(*)::int n FROM proposals WHERE lead_id = $1 AND status NOT IN ('draft','archived','rejected','expired')`, [leadId])).rows[0].n || 0);
+        if (hasProp > 0) {
+          const { analyzeNegotiation } = await import("./negotiate");
+          await analyzeNegotiation(leadId, msgs.rows.map((r: any) => r.body_text || "").join("\n"));
+        }
+      } catch {}
+    }
     return sig;
   } catch {
     return null;

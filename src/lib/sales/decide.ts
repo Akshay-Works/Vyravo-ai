@@ -107,5 +107,9 @@ export async function salesTick(opts: { max?: number; budgetMs?: number } = {}):
     const r = await rescoreTick({ max: 50 });
     rescored = r.rescored; scoreChanged = r.changed;
   } catch {}
+  try {
+    const { syncProposalStages } = await import("./deals");
+    await syncProposalStages();
+  } catch {}
   return { nurtured, open_escalations: Number(open.rows[0]?.n || 0), truncated: (cands.rowCount ?? 0) >= max, rescored, scoreChanged };
 }

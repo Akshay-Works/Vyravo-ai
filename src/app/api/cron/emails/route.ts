@@ -77,8 +77,16 @@ export async function GET(request: NextRequest) {
     } catch (e: any) {
       research = { researched: 0, error: String(e?.message || e).slice(0, 160) };
     }
-    await recordHeartbeat("cron_emails", "ok", { sent: outreach?.sent ?? 0, failed: outreach?.failed ?? 0, replyPolled: replyPoll?.polled ?? 0, replyApplied: replyPoll?.applied ?? 0, inbox, sales, research, workflows });
-    return Response.json({ ok: true, ...result, outreach, replyPoll, inbox, sales, research, workflows });
+    // Sales OS meetings — bounded Calendly poll; never breaks the cron.
+    let meetings: any = { booked: 0 };
+    try {
+      const { meetingTick } = await import("@/lib/sales/meetings");
+      meetings = await meetingTick({ max: 5, budgetMs: 20000 });
+    } catch (e: any) {
+      meetings = { booked: 0, error: String(e?.message || e).slice(0, 160) };
+    }
+    await recordHeartbeat("cron_emails", "ok", { sent: outreach?.sent ?? 0, failed: outreach?.failed ?? 0, replyPolled: replyPoll?.polled ?? 0, replyApplied: replyPoll?.applied ?? 0, inbox, sales, research, meetings, workflows });
+    return Response.json({ ok: true, ...result, outreach, replyPoll, inbox, sales, research, meetings, workflows });
   } catch (e) {
     console.error("Cron email error:", e);
     await recordHeartbeat("cron_emails", "error", {});
