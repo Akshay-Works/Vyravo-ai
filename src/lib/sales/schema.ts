@@ -81,7 +81,32 @@ export async function createEscalation(e: {
     `INSERT INTO sales_escalations (lead_id, kind, title, detail, recommendation, status)
      VALUES ($1,$2,$3,$4,$5,'open') RETURNING id`,
     [e.lead_id ?? null, e.kind, e.title.slice(0, 200), (e.detail || "").slice(0, 2000), (e.recommendation || "").slice(0, 1000)]);
-  return { id: Number(ins.rows[0].id), duplicate: false };
+  const newId = Number(ins.rows[0].id);
+  // Founder notification (§22): always for deal-critical kinds; otherwise
+  // only for high-value (score ≥ 80) leads. Fire-and-forget, never blocks.
+  try {
+    const critical = ["deal_won", "negotiation", "meeting_booked"].includes(e.kind);
+    let score = 0;
+    if (e.lead_id) {
+      const lr = await pool.query(`SELECT lead_score, business_name, email FROM leads WHERE id = $1`, [e.lead_id]);
+      score = Number(lr.rows[0]?.lead_score || 0);
+      var leadCtx = lr.rows[0];
+    }
+    if (critical || score >= 80) {
+      const to = (process.env.REPORT_EMAIL || process.env.EMAIL_USER || "").trim();
+      if (to) {
+        const { sendEmail } = await import("@/lib/email/send");
+        const esc = (s: any) => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").slice(0, 800);
+        const nm = (leadCtx as any)?.business_name || (leadCtx as any)?.email || `lead ${e.lead_id}`;
+        await sendEmail({
+          to, replyTo: process.env.ADMIN_REPLY_TO || undefined,
+          subject: `⚡ Sales action: ${e.title.slice(0, 80)}`,
+          html: `<p><b>WHY:</b> ${esc(e.kind)} needs founder input.</p><p><b>WHAT HAPPENED:</b> ${esc(nm)} — ${esc(e.detail)}</p><p><b>AI RECOMMENDS:</b> ${esc(e.recommendation)}</p><p><b>YOU NEED TO:</b> open Admin → Sales → Founder Actions (escalation #${newId}).</p>`,
+        });
+      }
+    }
+  } catch { /* notification failure must never break escalation creation */ }
+  return { id: newId, duplicate: false };
 }
 
 export async function isSuppressed(email: string): Promise<boolean> {

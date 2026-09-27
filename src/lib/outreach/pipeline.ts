@@ -323,7 +323,7 @@ export async function scheduleFollowUps(cfg: OutreachConfig): Promise<number> {
     // Follow-up (n+1) fires `days[n]` days AFTER THE INTRO EMAIL was sent —
     // matches the spec: Email 1 → Day 0, Follow-up 1 → Day 3, Follow-up 2 → Day 7.
     const r = await pool.query(
-      `SELECT e.* FROM outreach_events e
+      `SELECT e.*, e0.sent_at AS intro_sent_at FROM outreach_events e
        JOIN leads l ON l.id = e.lead_id
        JOIN outreach_events e0 ON e0.lead_id = e.lead_id AND e0.follow_up_number = 0
             AND e0.status = 'sent' AND e0.test_send = false
@@ -340,6 +340,17 @@ export async function scheduleFollowUps(cfg: OutreachConfig): Promise<number> {
     for (const ev of r.rows) {
       const lead = await pool.query(`SELECT * FROM leads WHERE id = $1`, [ev.lead_id]);
       if ((lead.rowCount ?? 0) === 0) continue;
+      // Experiment 'fu1_gap': variant day5 holds FU1 until day 5 (no-op unless active).
+      if (n === 0) {
+        try {
+          const { assignVariant } = await import("../sales/experiments");
+          const a = await assignVariant("fu1_gap", ev.lead_id);
+          if (a.enrolled && a.variant === "day5" && ev.intro_sent_at) {
+            const ageHrs = (Date.now() - new Date(ev.intro_sent_at).getTime()) / 3600000;
+            if (ageHrs < 5 * 24) continue;
+          }
+        } catch { /* experiment failure: fail open (standard timing) */ }
+      }
       const html = await buildOutreachEmail(lead.rows[0], n + 1);
       const ins = await pool.query(
         `INSERT INTO outreach_events (lead_id, recipient_email, subject, body, follow_up_number, status, queued_at)
@@ -745,6 +756,14 @@ export async function markReplied(leadId: number, meta: ReplyMeta = {}): Promise
       }
     } catch (e) { console.error("reply owner-alert failed (non-fatal):", e); }
   }
+  // Experiment attribution (best-effort): every reply credits enrolled variants.
+  try {
+    const { trackOutcome } = await import("../sales/experiments");
+    await trackOutcome(leadId, "replied");
+    const rc = await pool.query(`SELECT reply_class FROM leads WHERE id = $1`, [leadId]);
+    if (/positive|interested|pricing|meeting/i.test(String(rc.rows[0]?.reply_class || "")))
+      await trackOutcome(leadId, "positive");
+  } catch { /* attribution must never break reply handling */ }
   return "applied";
 }
 

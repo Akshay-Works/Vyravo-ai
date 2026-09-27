@@ -146,6 +146,37 @@ async function main() {
       console.log(`  SKIP (needs OpenAI/KB access): ${String(e?.message || e).slice(0, 120)}`);
     }
   }
+  console.log("experiments (live DB, cleaned)");
+  {
+    const { ensureExperimentSchema, assignVariant, trackOutcome, getExperimentResults } = await import("@/lib/sales/experiments");
+    await ensureExperimentSchema();
+    const exp = `test_exp_${Date.now()}`;
+    await pool.query(`INSERT INTO sales_experiments (name, description, status, variants) VALUES ($1,'test','paused',$2)`,
+      [exp, JSON.stringify([{ key: "control", weight: 1 }, { key: "day5", weight: 1 }])]);
+    const off = await assignVariant(exp, 402);
+    ok("paused → control", !off.enrolled && off.variant === "control", `${off.enrolled}/${off.variant}`);
+    await pool.query(`UPDATE sales_experiments SET status = 'active' WHERE name = $1`, [exp]);
+    const a1 = await assignVariant(exp, 402);
+    const a2 = await assignVariant(exp, 402);
+    ok("deterministic enrollment", a1.enrolled && a1.variant === a2.variant, `${a1.variant}/${a2.variant}`);
+    await trackOutcome(402, "replied");
+    const res = await getExperimentResults();
+    const mine = res.find((r: any) => r.name === exp);
+    ok("results aggregate", !!mine && mine.results.some((x: any) => x.enrolled >= 1 && x.replied >= 1), JSON.stringify(mine?.results || []));
+    await pool.query(`DELETE FROM sales_experiment_outcomes WHERE experiment = $1`, [exp]);
+    await pool.query(`DELETE FROM sales_experiment_assignments WHERE experiment = $1`, [exp]);
+    await pool.query(`DELETE FROM sales_experiments WHERE name = $1`, [exp]);
+  }
+  console.log("metrics (read-only)");
+  {
+    const { getSalesMetrics, getFounderActions, getRecentFailures, getTomorrowQueue, getBestOpportunities } = await import("@/lib/sales/metrics");
+    const m = await getSalesMetrics();
+    ok("metrics shape", m.today && m.ai && m.funnel && typeof m.paused === "boolean");
+    ok("founder actions array", Array.isArray(await getFounderActions(5)));
+    ok("failures array", Array.isArray(await getRecentFailures(5)));
+    ok("tomorrow queue", typeof (await getTomorrowQueue()).outreach_pending === "number");
+    ok("opportunities array", Array.isArray(await getBestOpportunities(3)));
+  }
 
   await pool.end();
   console.log(`\nRESULT: ${pass} passed, ${fail} failed`);
