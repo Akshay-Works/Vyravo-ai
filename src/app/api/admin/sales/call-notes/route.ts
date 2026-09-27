@@ -68,7 +68,24 @@ export async function POST(request: NextRequest) {
   } catch (e: any) {
     console.error("auto proposal draft failed:", e);
   }
+  // L2 outbox: hold the follow-up email for founder approval (never auto-send).
+  let heldEmailId: number | null = null;
+  const fu = parsed.followup_email && typeof parsed.followup_email === "object" ? parsed.followup_email : null;
+  if (fu && typeof fu.body === "string" && fu.body.trim().length >= 20 && lead.email) {
+    const html = `<div>${fu.body.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").split(/\n{2,}|\r?\n\r?\n/).map((p: string) => `<p style="margin:0 0 14px;">${p.replace(/\n/g, "<br>")}</p>`).join("")}</div>`;
+    const ins = await pool.query(
+      `INSERT INTO email_queue (lead_id, email_type, scheduled_for, status, template_data, created_at)
+       VALUES ($1,'followup_l2', now(), 'held', $2, now()) RETURNING id`,
+      [leadId, JSON.stringify({ to: lead.email, subject: String(fu.subject || "Following up").slice(0, 200), html, leadId })]);
+    heldEmailId = Number(ins.rows[0].id);
+    const { createEscalation } = await import("@/lib/sales/schema");
+    await createEscalation({ lead_id: leadId, kind: "email_approval",
+      title: `Follow-up email needs approval (outbox #${heldEmailId})`,
+      detail: `Post-call follow-up drafted. Subject: "${String(fu.subject || "").slice(0, 100)}"`,
+      recommendation: "Review in Sales → Outbox, then approve or discard." });
+  }
   return Response.json({ ok: true, summary: parsed.summary || "", requirements: reqs,
     objections: parsed.objections || [], proposalId: proposal?.proposalId || null,
-    proposalWarnings: proposal?.warnings || [], followup_email: parsed.followup_email || null, tasks });
+    proposalWarnings: proposal?.warnings || [], followup_email: parsed.followup_email || null,
+    heldEmailId, tasks });
 }

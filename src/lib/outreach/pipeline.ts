@@ -737,6 +737,11 @@ export async function markReplied(leadId: number, meta: ReplyMeta = {}): Promise
     const { advanceStage } = await import("../sales/stages");
     await advanceStage(leadId, "engaged", "prospect replied", { trigger: "markReplied" });
   } catch { /* stage move must never break reply handling */ }
+  // Multichannel: an email reply pauses WA/LI sequences for this lead.
+  try {
+    const { pauseChannels } = await import("../sales/orchestrate");
+    await pauseChannels(leadId, "email reply received");
+  } catch { /* channel pause must never break reply handling */ }
   if (firstReply) {
     console.log(`[REPLY] REPLY_MATCHED_TO_LEAD lead=${leadId} — follow-ups cancelled, status=replied`);
     // speed-to-lead: ping the owner immediately (fire-and-forget, never blocks)
@@ -771,6 +776,14 @@ export async function doNotContact(leadId: number): Promise<void> {
   await pool.query(`UPDATE leads SET status = 'do_not_contact', next_follow_up = NULL WHERE id = $1`, [leadId]);
   await pool.query(`UPDATE outreach_events SET status = 'cancelled' WHERE lead_id = $1 AND status IN ('queued')`, [leadId]);
   await pool.query(`UPDATE email_queue SET status = 'skipped' WHERE lead_id = $1 AND status = 'pending' AND template_data->>'outreach_event_id' IS NOT NULL`, [leadId]);
+  // Sales OS: DNC also pauses WA/LI sequences and suppresses the email globally.
+  try {
+    const { pauseChannels } = await import("../sales/orchestrate");
+    await pauseChannels(leadId, "do-not-contact");
+    const { addSuppression } = await import("../sales/schema");
+    const lr = await pool.query(`SELECT email FROM leads WHERE id = $1`, [leadId]);
+    if (lr.rows[0]?.email) await addSuppression(lr.rows[0].email, "do-not-contact", "doNotContact");
+  } catch { /* cross-channel DNC must never throw */ }
 }
 
 // ---------------------------------------------------------------------------

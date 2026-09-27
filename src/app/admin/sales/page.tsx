@@ -5,10 +5,15 @@ export default function SalesCommandCenter() {
   const [data, setData] = useState<any>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
+  const [outbox, setOutbox] = useState<any[]>([]);
 
   const load = useCallback(async () => {
     const r = await fetch("/api/admin/sales/metrics");
     setData(await r.json());
+    try {
+      const o = await fetch("/api/admin/sales/outbox");
+      setOutbox(((await o.json()).held || []) as any[]);
+    } catch { /* outbox secondary */ }
   }, []);
   // Initial load (legitimate fetch-on-view).
   // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -80,6 +85,26 @@ export default function SalesCommandCenter() {
           <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
             <button style={btn} disabled={busy} onClick={() => escAction(a.id, "ack")}>Acknowledge</button>
             <button style={btn} disabled={busy} onClick={() => escAction(a.id, "resolve")}>Resolve</button>
+          </div>
+        </div>
+      ))}
+
+      <h2 style={h}>Outbox — held for approval ({outbox.length})</h2>
+      {outbox.length === 0 && <div style={{ fontSize: 13, color: "#777" }}>No held emails. ✓</div>}
+      {outbox.map((o: any) => (
+        <div key={o.id} style={{ ...card, marginBottom: 8 }}>
+          <div style={{ fontSize: 13, color: "#555" }}>#{o.id} · {o.email_type} · {o.business_name || o.lead_email || ""} → {o.template_data?.to}</div>
+          <div style={{ fontWeight: 700, margin: "4px 0" }}>{o.template_data?.subject}</div>
+          <div style={{ fontSize: 13, whiteSpace: "pre-wrap" }}>{String(o.template_data?.html || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").slice(0, 400)}</div>
+          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+            {(["approve", "send_now", "discard"] as const).map((a) => (
+              <button key={a} style={btn} disabled={busy} onClick={async () => {
+                setBusy(true);
+                await fetch("/api/admin/sales/outbox", { method: "POST",
+                  headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: o.id, action: a }) });
+                await load(); setBusy(false);
+              }}>{a === "send_now" ? "Send now" : a[0].toUpperCase() + a.slice(1)}</button>
+            ))}
           </div>
         </div>
       ))}

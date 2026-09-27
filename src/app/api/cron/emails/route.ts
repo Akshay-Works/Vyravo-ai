@@ -85,8 +85,26 @@ export async function GET(request: NextRequest) {
     } catch (e: any) {
       meetings = { booked: 0, error: String(e?.message || e).slice(0, 160) };
     }
-    await recordHeartbeat("cron_emails", "ok", { sent: outreach?.sent ?? 0, failed: outreach?.failed ?? 0, replyPolled: replyPoll?.polled ?? 0, replyApplied: replyPoll?.applied ?? 0, inbox, sales, research, meetings, workflows });
-    return Response.json({ ok: true, ...result, outreach, replyPoll, inbox, sales, research, meetings, workflows });
+    // Morning sales report — yesterday's numbers emailed to the founder.
+    let reportMail = "skipped";
+    try {
+      const to = (process.env.REPORT_EMAIL || "").trim();
+      if (to) {
+        const { getSalesMetrics, getFounderActions, getRecentFailures } = await import("@/lib/sales/metrics");
+        const { sendEmail } = await import("@/lib/email/send");
+        const y = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+        const m = await getSalesMetrics(y);
+        const acts = await getFounderActions(10);
+        const fails = await getRecentFailures(5);
+        const esc = (s: any) => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").slice(0, 300);
+        const li = (o: any) => Object.entries(o).map(([k, v]) => `${String(k).replace(/_/g, " ")}: ${v}`).join(" · ");
+        await sendEmail({ to, subject: `📊 Sales ${y} — ${m.today.replies} replies, ${m.today.meetings_booked} meetings, ${acts.length} need you`,
+          html: `<h3>Yesterday (${y})</h3><p>${esc(li(m.today))}</p><h3>AI activity</h3><p>${esc(li(m.ai))}</p><h3>Founder actions (${acts.length})</h3>${acts.map((a: any) => `<p>• <b>${esc(a.title)}</b> — ${esc(a.recommendation)}</p>`).join("") || "<p>None. ✓</p>"}<h3>Problems (${fails.length})</h3>${fails.map((f: any) => `<p>• [${esc(f.source)}] ${esc(f.error)}</p>`).join("") || "<p>None. ✓</p>"}` });
+        reportMail = "sent";
+      }
+    } catch (e: any) { console.error("sales report mail failed:", e); reportMail = "error"; }
+    await recordHeartbeat("cron_emails", "ok", { sent: outreach?.sent ?? 0, failed: outreach?.failed ?? 0, replyPolled: replyPoll?.polled ?? 0, replyApplied: replyPoll?.applied ?? 0, inbox, sales, research, meetings, reportMail, workflows });
+    return Response.json({ ok: true, ...result, outreach, replyPoll, inbox, sales, research, meetings, reportMail, workflows });
   } catch (e) {
     console.error("Cron email error:", e);
     await recordHeartbeat("cron_emails", "error", {});

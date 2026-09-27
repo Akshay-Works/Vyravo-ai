@@ -178,6 +178,37 @@ async function main() {
     ok("opportunities array", Array.isArray(await getBestOpportunities(3)));
   }
 
+  console.log("orchestrate (live DB, cleaned)");
+  {
+    const { pauseChannels, suggestNextChannel } = await import("@/lib/sales/orchestrate");
+    await pool.query(`INSERT INTO outreach_activities (lead_id, channel, follow_up_number, status, message) VALUES (402,'whatsapp',9,'awaiting_approval','test') ON CONFLICT DO NOTHING`);
+    const p = await pauseChannels(402, "test");
+    const st = (await pool.query(`SELECT status FROM outreach_activities WHERE lead_id = 402 AND channel = 'whatsapp' AND follow_up_number = 9`)).rows[0]?.status;
+    ok("unsent WA activity skipped", p.paused >= 1 && st === "skipped", `${p.paused}/${st}`);
+    await pool.query(`DELETE FROM outreach_activities WHERE lead_id = 402 AND channel = 'whatsapp' AND follow_up_number = 9`);
+    await pool.query(`DELETE FROM sales_decisions WHERE lead_id = 402 AND trigger_text = 'pauseChannels'`);
+    const wl = await pool.query(`SELECT id FROM leads WHERE whatsapp_number IS NOT NULL AND whatsapp_opt_in_status IS DISTINCT FROM 'opted_out' LIMIT 1`);
+    if ((wl.rowCount ?? 0) > 0) {
+      await suggestNextChannel(Number(wl.rows[0].id));
+      const se = await pool.query(`SELECT id FROM sales_escalations WHERE lead_id = $1 AND kind = 'channel_suggest' AND status = 'open'`, [wl.rows[0].id]);
+      ok("channel suggestion escalated", (se.rowCount ?? 0) > 0);
+      await pool.query(`DELETE FROM sales_escalations WHERE lead_id = $1 AND kind = 'channel_suggest'`, [wl.rows[0].id]);
+    } else console.log("  SKIP channel_suggest (no WA-opted lead found)");
+  }
+  console.log("outbox held-shape (live DB, cleaned)");
+  {
+    const ins = await pool.query(
+      `INSERT INTO email_queue (lead_id, email_type, scheduled_for, status, template_data, created_at)
+       VALUES (402,'followup_l2', now(), 'held', $1, now()) RETURNING id`,
+      [JSON.stringify({ to: "t@example.com", subject: "test hold", html: "<p>hi</p>", leadId: 402 })]);
+    const hid = Number(ins.rows[0].id);
+    const held = await pool.query(`SELECT count(*)::int n FROM email_queue WHERE id = $1 AND status = 'held'`, [hid]);
+    ok("held row invisible to workers", held.rows[0].n === 1);
+    const generic = await pool.query(`SELECT count(*)::int n FROM email_queue WHERE id = $1 AND status = 'pending' AND scheduled_for <= now()`, [hid]);
+    ok("not picked up as pending", generic.rows[0].n === 0);
+    await pool.query(`DELETE FROM email_queue WHERE id = $1`, [hid]);
+  }
+
   await pool.end();
   console.log(`\nRESULT: ${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);

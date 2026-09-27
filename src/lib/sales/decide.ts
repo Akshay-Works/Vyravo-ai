@@ -97,6 +97,10 @@ export async function salesTick(opts: { max?: number; budgetMs?: number } = {}):
       if (r.moved) {
         nurtured++;
         await pool.query(`UPDATE leads SET next_follow_up = now() + interval '30 days' WHERE id = $1`, [row.id]);
+        try {
+          const { suggestNextChannel } = await import("./orchestrate");
+          await suggestNextChannel(Number(row.id));
+        } catch { /* suggestion is non-fatal */ }
       }
     } catch {}
   }

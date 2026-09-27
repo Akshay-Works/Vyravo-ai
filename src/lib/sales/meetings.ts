@@ -78,6 +78,10 @@ export async function meetingTick(opts: { max?: number; budgetMs?: number } = {}
       // Stop promotional outreach — a booked meeting ends the sales sequence.
       await pool.query(`UPDATE outreach_events SET status = 'cancelled' WHERE lead_id = $1 AND status IN ('queued','sending')`, [leadId]);
       await pool.query(`UPDATE email_queue SET status = 'skipped' WHERE lead_id = $1 AND status = 'pending' AND template_data->>'outreach_event_id' IS NOT NULL`, [leadId]);
+      try {
+        const { pauseChannels } = await import("./orchestrate");
+        await pauseChannels(leadId, "meeting booked");
+      } catch { /* channel pause is non-fatal */ }
       const brief = await buildDiscoveryBrief(leadId);
       await pool.query(`UPDATE leads SET meeting_status = 'scheduled', meeting_date = $2, meeting_brief = $3 WHERE id = $1`,
         [leadId, ev.startTime ? new Date(ev.startTime) : new Date(), brief]);
