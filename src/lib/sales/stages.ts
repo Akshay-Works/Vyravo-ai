@@ -1,29 +1,70 @@
 // ============================================================================
-// SALES OS — canonical pipeline (§16). Every lead has exactly one stage.
-// Active stages move forward; any stage can move to a terminal stage.
+// SALES OS — canonical pipeline. Every lead has exactly one stage.
+//
+// Full lifecycle (forward-only, except the replied_to → replied conversation
+// back-edge): new → researched → contacted → replied ⇄ replied_to → qualified
+// → meeting_booked → discovery_completed → proposal_sent → negotiation →
+// verbal_agreement → invoice_sent → payment_pending → won → onboarding →
+// active_client. Any stage → terminal (sticky; admin force to revive).
 // Unknown legacy values are treated as 'new' (never crash, never stuck).
 // ============================================================================
 import { pool } from "@/db";
 import { logDecision } from "./schema";
 
 export const ACTIVE_STAGES = [
-  "new", "researched", "contacted", "engaged", "qualified", "meeting_booked",
-  "discovery_completed", "proposal_sent", "negotiation", "verbal_agreement", "won", "onboarding",
+  "new", "researched", "contacted", "replied", "replied_to", "qualified",
+  "meeting_booked", "discovery_completed", "proposal_sent", "negotiation",
+  "verbal_agreement", "invoice_sent", "payment_pending", "won", "onboarding",
+  "active_client",
 ] as const;
 
 export const TERMINAL_STAGES = [
-  "not_interested", "wrong_contact", "unqualified", "lost", "no_response", "nurture",
+  "not_interested", "unqualified", "wrong_contact", "unsubscribed",
+  "lost", "no_response", "nurture",
 ] as const;
 
 export const ALL_STAGES = [...ACTIVE_STAGES, ...TERMINAL_STAGES] as const;
 export type SalesStage = (typeof ALL_STAGES)[number];
 
+export const STAGE_LABELS: Record<string, string> = {
+  new: "New Lead",
+  researched: "Researched",
+  contacted: "Contacted",
+  replied: "Reply Received",
+  replied_to: "Replied",
+  qualified: "Qualified",
+  meeting_booked: "Meeting Booked",
+  discovery_completed: "Discovery Completed",
+  proposal_sent: "Proposal Sent",
+  negotiation: "Negotiation",
+  verbal_agreement: "Verbal Agreement",
+  invoice_sent: "Invoice Sent",
+  payment_pending: "Payment Pending",
+  won: "Paid / Won",
+  onboarding: "Onboarding",
+  active_client: "Active Client",
+  not_interested: "Not Interested",
+  unqualified: "Unqualified",
+  wrong_contact: "Wrong Contact",
+  unsubscribed: "Unsubscribed",
+  lost: "Lost",
+  no_response: "No Response",
+  nurture: "Nurture",
+};
+
+export function stageLabel(s: string): string {
+  return STAGE_LABELS[s] || s;
+}
+
 const ORDER = new Map<string, number>(ACTIVE_STAGES.map((s, i) => [s, i]));
 
 /** Legacy CRM values → canonical stages. Never regress automation state. */
 const LEGACY_MAP: Record<string, string> = {
+  engaged: "replied",           // pre-lifecycle name for "prospect replied"
   ready_for_outreach: "researched",
-  archived: "lost", // archived = dead in legacy CRM → terminal, automation stops
+  archived: "lost",             // archived = dead in legacy CRM → terminal
+  paid: "won",
+  client: "active_client",
 };
 
 export function normalizeStage(raw: any): string {
@@ -44,6 +85,7 @@ export function canTransition(fromRaw: any, toRaw: any): boolean {
   if (from === to) return true;
   if (isTerminal(to)) return true; // any → terminal always allowed
   if (isTerminal(from)) return false; // terminal is sticky (admin force to revive)
+  if (from === "replied_to" && to === "replied") return true; // conversation loop back-edge
   return (ORDER.get(to) ?? -1) >= (ORDER.get(from) ?? 0);
 }
 
@@ -67,7 +109,7 @@ export async function advanceStage(
   await pool.query(
     `INSERT INTO activities (type, action, description, lead_id, created_at)
      VALUES ('lead','stage_changed',$2,$1,now())`,
-    [leadId, `Stage: ${from} → ${dest} — ${reason}`.slice(0, 300)]).catch(() => {});
+    [leadId, `Stage: ${stageLabel(from)} → ${stageLabel(dest)} — ${reason}`.slice(0, 300)]).catch(() => {});
   await logDecision({
     lead_id: leadId, trigger_text: opts.trigger || "advanceStage", from_stage: from, to_stage: dest,
     action: "stage_move", autonomy: opts.actor === "admin" ? "none" : "L1",

@@ -7,7 +7,7 @@
 // ============================================================================
 import { pool } from "@/db";
 import { logDecision } from "./schema";
-import { advanceStage } from "./stages";
+
 
 export async function ensureSignalsColumn(): Promise<void> {
   await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS signals jsonb`);
@@ -85,7 +85,8 @@ export async function researchTick(opts: { max?: number; budgetMs?: number } = {
       const sig = extractSignals(html, lead.business_website);
       await pool.query(`UPDATE leads SET signals = COALESCE(signals,'{}') || $2 WHERE id = $1`,
         [lead.id, JSON.stringify({ ...sig, attempts })]);
-      await advanceStage(Number(lead.id), "researched", "website researched (observable signals only)", { trigger: "researchTick" });
+      const { emitSalesEvent } = await import("./lifecycle");
+      await emitSalesEvent({ key: `researched-${lead.id}-${sig.has_chatbot}-${sig.has_booking}`, type: "LEAD_RESEARCHED", leadId: Number(lead.id), payload: { url: lead.business_website } });
       await logDecision({ lead_id: lead.id, trigger_text: "researchTick", to_stage: "researched",
         action: "researched", autonomy: "L1", reason: `signals: chat=${sig.has_chatbot} booking=${sig.has_booking} wa=${sig.has_whatsapp}`,
         context: { url: lead.business_website }, result: "researched" });

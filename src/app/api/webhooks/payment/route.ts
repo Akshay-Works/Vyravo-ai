@@ -38,6 +38,22 @@ export async function POST(request: NextRequest) {
       metadata: { amount, currency, source: "webhook" },
     });
 
+    // Sales OS: provider-confirmed payment → lifecycle (idempotent on eventId —
+    // the same webhook twice records payment exactly once).
+    try {
+      const { recordPayment } = await import("@/lib/sales/invoices");
+      await recordPayment({
+        providerRef: String(eventId).slice(0, 200),
+        invoiceId: invoiceId ? Number(invoiceId) : undefined,
+        paymentId: String(eventId).slice(0, 200),
+        amount: Number(amount) || undefined,
+        currency: String(currency || "INR").toUpperCase().slice(0, 8),
+        provider: "stripe",
+      });
+    } catch (e) {
+      console.error("sales payment record failed (non-fatal):", e);
+    }
+
     return Response.json({ success: true, eventId });
   } catch (e: any) {
     console.error("Payment webhook error:", e);

@@ -50,6 +50,53 @@ export async function ensureSalesSchema(): Promise<void> {
       source text NOT NULL DEFAULT '',
       created_at timestamptz DEFAULT now()
     )`);
+
+  // Lifecycle event log + idempotency keys (every event processed exactly once).
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS sales_events (
+      id serial PRIMARY KEY,
+      event_key text UNIQUE NOT NULL,
+      event_type text NOT NULL,
+      lead_id integer REFERENCES leads(id) ON DELETE SET NULL,
+      payload jsonb NOT NULL DEFAULT '{}',
+      created_at timestamptz DEFAULT now(),
+      processed_at timestamptz,
+      result text NOT NULL DEFAULT ''
+    )`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_sales_events_lead ON sales_events(lead_id)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_sales_events_type ON sales_events(event_type)`);
+
+  // Invoice/payment ledger (provider-agnostic; Stripe-ready, manual until then).
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS sales_invoices (
+      id serial PRIMARY KEY,
+      lead_id integer REFERENCES leads(id) ON DELETE SET NULL,
+      proposal_id integer,
+      invoice_no text UNIQUE NOT NULL,
+      amount numeric NOT NULL DEFAULT 0,
+      currency text NOT NULL DEFAULT 'INR',
+      status text NOT NULL DEFAULT 'draft',
+      provider text NOT NULL DEFAULT 'manual',
+      provider_ref text UNIQUE,
+      payment_id text,
+      payment_link text,
+      due_date timestamptz,
+      paid_at timestamptz,
+      created_at timestamptz DEFAULT now(),
+      updated_at timestamptz DEFAULT now()
+    )`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_sales_invoices_lead ON sales_invoices(lead_id)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_sales_invoices_status ON sales_invoices(status)`);
+
+  // Lead commercial fields (additive; safe on every boot).
+  await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS deal_value numeric`);
+  await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS deal_currency text DEFAULT 'INR'`);
+  await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS next_action text`);
+  await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS next_action_date timestamptz`);
+  await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS referred_by_lead_id integer REFERENCES leads(id) ON DELETE SET NULL`);
+  await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS first_contacted_at timestamptz`);
+  await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS first_contact_channel text`);
+  await pool.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS first_contact_message_id text`);
 }
 
 export async function logDecision(d: {

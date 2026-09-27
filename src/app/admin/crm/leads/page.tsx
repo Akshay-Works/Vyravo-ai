@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { db } from "@/db";
 import { leads } from "@/db/schema";
 import { desc, eq, or, isNull, count } from "drizzle-orm";
@@ -51,18 +52,18 @@ export default async function CrmLeadsPage({ searchParams }: { searchParams: Pro
         </div>
       </div>
       <div className="flex flex-wrap gap-2">
-        <a href="/admin/crm/leads" className={`rounded-full border px-3 py-1 text-xs font-semibold ${!cityFilter ? "border-primary/50 bg-primary/10 text-white" : "border-border bg-surface text-grey hover:text-white"}`}>
+        <Link href="/admin/crm/leads" className={`rounded-full border px-3 py-1 text-xs font-semibold ${!cityFilter ? "border-primary/50 bg-primary/10 text-white" : "border-border bg-surface text-grey hover:text-white"}`}>
           All ({totalLeads})
-        </a>
+        </Link>
         {cityList.map(([city, n]) => (
-          <a key={city} href={`/admin/crm/leads?city=${encodeURIComponent(city)}`} className={`rounded-full border px-3 py-1 text-xs font-semibold ${city === cityFilter ? "border-primary/50 bg-primary/10 text-white" : "border-border bg-surface text-grey hover:text-white"}`}>
+          <Link key={city} href={`/admin/crm/leads?city=${encodeURIComponent(city)}`} className={`rounded-full border px-3 py-1 text-xs font-semibold ${city === cityFilter ? "border-primary/50 bg-primary/10 text-white" : "border-border bg-surface text-grey hover:text-white"}`}>
             {city} ({n})
-          </a>
+          </Link>
         ))}
         {unknownCity > 0 && (
-          <a href="/admin/crm/leads?city=__unknown" className={`rounded-full border px-3 py-1 text-xs font-semibold ${cityFilter === "__unknown" ? "border-primary/50 bg-primary/10 text-white" : "border-border bg-surface text-grey hover:text-white"}`}>
+          <Link href="/admin/crm/leads?city=__unknown" className={`rounded-full border px-3 py-1 text-xs font-semibold ${cityFilter === "__unknown" ? "border-primary/50 bg-primary/10 text-white" : "border-border bg-surface text-grey hover:text-white"}`}>
             Unknown ({unknownCity})
-          </a>
+          </Link>
         )}
       </div>
       <div className="overflow-x-auto rounded-xl border border-border bg-surface">
@@ -78,7 +79,7 @@ export default async function CrmLeadsPage({ searchParams }: { searchParams: Pro
             {rows.map((r) => (
               <tr key={r.id} className="border-b border-border/60 last:border-0">
                 <td className="p-3">
-                  <div className="font-medium text-white">{r.fullName}</div>
+                  <Link href={`/admin/crm/leads/${r.id}`} className="font-medium text-white hover:text-primary hover:underline">{r.fullName}</Link>
                   {r.businessWebsite && (
                     <a className="text-xs text-primary hover:underline" href={r.businessWebsite} target="_blank" rel="noreferrer">
                       {r.businessWebsite.replace(/^https?:\/\//, "").slice(0, 40)}

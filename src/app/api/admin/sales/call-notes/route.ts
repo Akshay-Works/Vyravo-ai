@@ -55,7 +55,12 @@ export async function POST(request: NextRequest) {
   if (meetingId)
     await pool.query(`UPDATE meetings SET summary = $2, action_items = $3, status = 'completed', updated_at = now() WHERE id = $1`,
       [meetingId, String(parsed.summary || "").slice(0, 2000), JSON.stringify(tasks)]);
-  await advanceStage(leadId, "discovery_completed", "call notes processed", { actor: "admin", trigger: "call-notes" });
+  try {
+    const { emitSalesEvent } = await import("@/lib/sales/lifecycle");
+    await emitSalesEvent({ key: `meeting-done-${meetingId || leadId}-${Date.now()}`, type: "MEETING_COMPLETED", leadId, payload: { reason: "call notes processed" } });
+  } catch {
+    await advanceStage(leadId, "discovery_completed", "call notes processed", { actor: "admin", trigger: "call-notes" });
+  }
   await pool.query(`INSERT INTO activities (type, action, description, lead_id, created_at) VALUES ('lead','call_logged',$2,$1,now())`,
     [leadId, `Discovery notes logged (${notes.length} chars) — summary + proposal drafted`]).catch(() => {});
   await logDecision({ lead_id: leadId, trigger_text: "call-notes", to_stage: "discovery_completed",

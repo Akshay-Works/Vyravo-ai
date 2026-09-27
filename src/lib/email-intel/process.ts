@@ -203,6 +203,10 @@ async function processOne(msg: any, cfg: Awaited<ReturnType<typeof getInboxConfi
   if (action === "unsubscribe") {
     if (msg.lead_id) {
       await doNotContact(Number(msg.lead_id));
+      try {
+        const { emitSalesEvent } = await import("@/lib/sales/lifecycle");
+        await emitSalesEvent({ key: `unsub-${msg.message_id || msg.id}`, type: "UNSUBSCRIBED", leadId: Number(msg.lead_id), payload: { via: "reply" } });
+      } catch { /* lifecycle is non-fatal */ }
       await pool.query(`INSERT INTO activities (type, action, description, lead_id, created_at) VALUES ('lead','unsubscribed',$2,$1,now())`,
         [msg.lead_id, `Unsubscribed via email reply — outreach stopped, no response sent`]).catch(() => {});
     }
@@ -217,6 +221,10 @@ async function processOne(msg: any, cfg: Awaited<ReturnType<typeof getInboxConfi
   }
   if (action === "no_reply") {
     if (msg.lead_id) {
+      try {
+        const { emitSalesEvent } = await import("@/lib/sales/lifecycle");
+        await emitSalesEvent({ key: `notint-${msg.message_id || msg.id}`, type: "DEAL_LOST", leadId: Number(msg.lead_id), payload: { to: "not_interested", reason: "not interested via reply" } });
+      } catch { /* lifecycle is non-fatal */ }
       await pool.query(`UPDATE outreach_events SET status = 'cancelled' WHERE lead_id = $1 AND status IN ('queued','sending')`, [msg.lead_id]);
       await pool.query(`UPDATE email_queue SET status = 'skipped' WHERE lead_id = $1 AND status = 'pending' AND template_data->>'outreach_event_id' IS NOT NULL`, [msg.lead_id]);
       await pool.query(`INSERT INTO activities (type, action, description, lead_id, created_at) VALUES ('lead','not_interested',$2,$1,now())`,
@@ -260,6 +268,13 @@ async function processOne(msg: any, cfg: Awaited<ReturnType<typeof getInboxConfi
     [`vyravo-out-${msg.id}-${Date.now()}`, msg.thread_id, msg.lead_id, DEFAULT_REPLY_TO, [msg.from_email], `Re: ${cleanSub}`, draft.body, (sent as any).id || null]);
   const due = new Date(Date.now() + 4 * 86400000);
   await pool.query(`UPDATE inbox_messages SET status = 'sent', sent_message_id = $2, follow_up_due_at = $3 WHERE id = $1`, [msg.id, (sent as any).id || null, due]);
+  // Sales OS: our response sent → REPLIED_TO (wait for prospect's next move).
+  if (msg.lead_id) {
+    try {
+      const { emitSalesEvent } = await import("@/lib/sales/lifecycle");
+      await emitSalesEvent({ key: `reply-sent-${msg.id}`, type: "REPLY_SENT", leadId: Number(msg.lead_id), payload: { messageId: msg.message_id } });
+    } catch { /* lifecycle is non-fatal */ }
+  }
   if (msg.lead_id) {
     await pool.query(`UPDATE leads SET last_contacted_at = now(), next_follow_up = $2 WHERE id = $1`, [msg.lead_id, due]);
     await pool.query(`INSERT INTO activities (type, action, description, lead_id, created_at) VALUES ('lead','auto_replied',$2,$1,now())`,
@@ -290,6 +305,9 @@ export async function contactReferral(msg: any, _lead: any, e: IntelEntity): Pro
   const existing = await pool.query(`SELECT id FROM leads WHERE lower(email) = $1 LIMIT 1`, [e.email]);
   if ((existing.rowCount ?? 0) > 0) {
     leadId = Number(existing.rows[0].id);
+    if (msg.lead_id) {
+      await pool.query(`UPDATE leads SET referred_by_lead_id = COALESCE(referred_by_lead_id, $2) WHERE id = $1`, [leadId, Number(msg.lead_id)]).catch(() => {});
+    }
   } else {
     const referrer = msg.from_name || msg.from_email;
     const nm = (e.name || e.email.split("@")[0]).replace(/[._-]+/g, " ").trim() || "New contact";
@@ -317,6 +335,10 @@ export async function contactReferral(msg: any, _lead: any, e: IntelEntity): Pro
   await pool.query(`UPDATE leads SET last_contacted_at = now(), next_follow_up = $2 WHERE id = $1`, [leadId, due]);
   await pool.query(`INSERT INTO activities (type, action, description, lead_id, created_at) VALUES ('lead','referral_contacted',$2,$1,now())`,
     [leadId, `Warm referral email sent (via ${referrer})`]).catch(() => {});
+  try {
+    const { emitSalesEvent } = await import("@/lib/sales/lifecycle");
+    await emitSalesEvent({ key: `referral-sent-${msg.message_id}-${e.email}`.slice(0, 200), type: "OUTREACH_SENT", leadId, payload: { channel: "referral-email" } });
+  } catch { /* lifecycle is non-fatal */ }
   await auditInbox({ message_id: msg.message_id, thread_id: msg.thread_id, lead_id: leadId, action: "referral_sent", detail: { email: e.email, conf: e.confidence, provider: sent.provider } });
 }
 

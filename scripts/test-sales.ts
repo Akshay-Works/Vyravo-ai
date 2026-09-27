@@ -17,7 +17,7 @@ async function main() {
   ok("backward blocked", !canTransition("contacted", "new") && !canTransition("proposal_sent", "engaged"));
   ok("any → terminal", canTransition("negotiation", "lost") && canTransition("new", "nurture"));
   ok("terminal sticky", !canTransition("lost", "contacted") && !canTransition("nurture", "qualified"));
-  ok("same-stage ok", canTransition("engaged", "engaged"));
+  ok("same-stage ok", canTransition("replied", "replied") && canTransition("engaged", "replied"));
   ok("unknown from = new", canTransition("garbage_value", "contacted") && !canTransition("garbage_value", "bogus"));
   ok("bogus to rejected", !canTransition("new", "bogus"));
   ok("normalize/isTerminal", normalizeStage("WON") === "won" && normalizeStage("xx") === "new" && isTerminal("lost") && !isTerminal("won"));
@@ -207,6 +207,96 @@ async function main() {
     const generic = await pool.query(`SELECT count(*)::int n FROM email_queue WHERE id = $1 AND status = 'pending' AND scheduled_for <= now()`, [hid]);
     ok("not picked up as pending", generic.rows[0].n === 0);
     await pool.query(`DELETE FROM email_queue WHERE id = $1`, [hid]);
+  }
+
+  console.log("lifecycle transitions (pure)");
+  {
+    const { canTransition, normalizeStage } = await import("@/lib/sales/stages");
+    const { toSalesIntent } = await import("@/lib/sales/classify");
+    ok("full chain forward", ["researched","contacted","replied","replied_to","qualified","meeting_booked","discovery_completed","proposal_sent","negotiation","verbal_agreement","invoice_sent","payment_pending","won","onboarding","active_client"]
+      .every((s, i, a) => canTransition(i === 0 ? "new" : a[i - 1], s)));
+    ok("backward blocked", !canTransition("qualified", "contacted") && !canTransition("won", "proposal_sent"));
+    ok("any → terminal", canTransition("negotiation", "lost") && canTransition("new", "nurture"));
+    ok("terminal sticky", !canTransition("lost", "contacted") && !canTransition("nurture", "new"));
+    ok("conversation back-edge", canTransition("replied_to", "replied"));
+    ok("legacy engaged → replied", normalizeStage("engaged") === "replied");
+    ok("unknown → new", normalizeStage("bogus_xyz") === "new");
+    ok("intent unsubscribe", toSalesIntent("unsubscribe", null, 0).intent === "UNSUBSCRIBE");
+    ok("intent meeting hi-conf", toSalesIntent(null, "meeting_request", 0.9).escalate === "meeting_request");
+    ok("intent meeting lo-conf → review", toSalesIntent(null, "meeting_request", 0.5).intent === "HUMAN_REVIEW");
+    ok("intent pricing", toSalesIntent(null, "pricing_request", 0.9).intent === "PRICING");
+    ok("intent wrong person", toSalesIntent(null, "wrong_person", 0.8).stageMove === "wrong_contact");
+    ok("intent objection", toSalesIntent(null, "objection", 0.8).intent === "OBJECTION");
+    ok("intent ooo no-move", toSalesIntent("out_of_office", null, 0).stageMove === null);
+  }
+  console.log("lifecycle engine (live DB, cleaned)");
+  {
+    const { emitSalesEvent } = await import("@/lib/sales/lifecycle");
+    const k = `test-dedupe-${Date.now()}`;
+    const r1 = await emitSalesEvent({ key: k, type: "LEAD_CREATED", leadId: 402, payload: {} });
+    const r2 = await emitSalesEvent({ key: k, type: "LEAD_CREATED", leadId: 402, payload: {} });
+    ok("same event twice → duplicate", !r1.duplicate && r2.duplicate);
+    await pool.query(`DELETE FROM sales_events WHERE event_key = $1`, [k]);
+  }
+  console.log("full journey new → active_client (live DB, cleaned)");
+  {
+    const { emitSalesEvent } = await import("@/lib/sales/lifecycle");
+    const { createInvoice, recordPayment } = await import("@/lib/sales/invoices");
+    const { completeOnboarding } = await import("@/lib/sales/onboarding");
+    const tag = `lj${Date.now()}`;
+    const ins = await pool.query(
+      `INSERT INTO leads (full_name, email, business_name, stage, status, source) VALUES ($1,$2,$3,'new','active','lifecycle-test') RETURNING id`,
+      [`Lifecycle Test ${tag}`, `${tag}@example.com`, `TestCo ${tag}`]);
+    const lid = Number(ins.rows[0].id);
+    let stepN = 0;
+    const step = async (type: string, payload: any = {}) => emitSalesEvent({ key: `${tag}-${++stepN}-${type}`, type, leadId: lid, payload });
+    const stage = async () => (await pool.query(`SELECT stage FROM leads WHERE id = $1`, [lid])).rows[0].stage;
+    await step("LEAD_CREATED");
+    await step("LEAD_RESEARCHED"); ok("journey researched", (await stage()) === "researched");
+    await step("OUTREACH_SENT", { channel: "email" }); ok("journey contacted", (await stage()) === "contacted");
+    await step("EMAIL_RECEIVED"); ok("journey replied", (await stage()) === "replied");
+    await step("REPLY_SENT"); ok("journey replied_to", (await stage()) === "replied_to");
+    await step("EMAIL_RECEIVED"); ok("journey loop back to replied", (await stage()) === "replied");
+    await step("LEAD_QUALIFIED", { reason: "test" }); ok("journey qualified", (await stage()) === "qualified");
+    await step("MEETING_BOOKED"); ok("journey meeting", (await stage()) === "meeting_booked");
+    await step("MEETING_COMPLETED"); ok("journey discovery", (await stage()) === "discovery_completed");
+    await step("PROPOSAL_SENT", { proposalId: 1 }); ok("journey proposal", (await stage()) === "proposal_sent");
+    await step("NEGOTIATION_STARTED", { summary: "test discount ask" }); ok("journey negotiation", (await stage()) === "negotiation");
+    await step("AGREEMENT_DETECTED", { confidence: 0.95, evidence: "test: let's proceed" });
+    ok("journey verbal", (await stage()) === "verbal_agreement");
+    const inv = await createInvoice(lid, { amount: 25000, currency: "INR" });
+    const { sendInvoice } = await import("@/lib/sales/invoices");
+    await sendInvoice(inv.id, "test");
+    ok("journey payment_pending", (await stage()) === "payment_pending");
+    const pay1 = await recordPayment({ providerRef: `${tag}-pay`, invoiceId: inv.id, amount: 25000, currency: "INR", provider: "manual" });
+    ok("payment applied → onboarding", pay1.applied && (await stage()) === "onboarding");
+    const pay2 = await recordPayment({ providerRef: `${tag}-pay`, invoiceId: inv.id, amount: 25000, currency: "INR", provider: "manual" });
+    ok("payment webhook twice → once", !pay2.applied);
+    await completeOnboarding(lid, "test", "test complete");
+    ok("journey active_client", (await stage()) === "active_client");
+    // terminal + unsubscribe + referral paths on throwaway leads
+    const t2 = (await pool.query(`INSERT INTO leads (full_name, email, stage, status, source) VALUES ('T2','${tag}t2@example.com','contacted','active','lifecycle-test') RETURNING id`)).rows[0].id;
+    await emitSalesEvent({ key: `${tag}-ni`, type: "DEAL_LOST", leadId: Number(t2), payload: { to: "not_interested", reason: "test" } });
+    ok("not_interested terminal", (await pool.query(`SELECT stage FROM leads WHERE id = $1`, [t2])).rows[0].stage === "not_interested");
+    const t3 = (await pool.query(`INSERT INTO leads (full_name, email, stage, status, source) VALUES ('T3','${tag}t3@example.com','contacted','active','lifecycle-test') RETURNING id`)).rows[0].id;
+    await emitSalesEvent({ key: `${tag}-unsub`, type: "UNSUBSCRIBED", leadId: Number(t3), payload: {} });
+    const t3s = (await pool.query(`SELECT stage FROM leads WHERE id = $1`, [t3])).rows[0].stage;
+    const supp = await pool.query(`SELECT 1 FROM suppression_list WHERE email = $1`, [`${tag}t3@example.com`]);
+    ok("unsubscribed + suppressed", t3s === "unsubscribed" && (supp.rowCount ?? 0) > 0);
+    const { handleReferral } = await import("@/lib/sales/referrals");
+    const ref = await handleReferral(402, { email: `${tag}ref@example.com`, name: "Referred Person", context: "test" });
+    const refRow = (await pool.query(`SELECT stage, referred_by_lead_id, source FROM leads WHERE id = $1`, [ref.leadId])).rows[0];
+    ok("referral own lifecycle + link", ref.created && refRow.stage === "new" && Number(refRow.referred_by_lead_id) === 402 && refRow.source === "referral");
+    // cleanup (children first: self-FK + invoice/lead FKs)
+    await pool.query(`DELETE FROM sales_events WHERE lead_id IN ($1,$2,$3,$4)`, [lid, t2, t3, ref.leadId]).catch(() => {});
+    await pool.query(`DELETE FROM sales_decisions WHERE lead_id IN ($1,$2,$3,$4)`, [lid, t2, t3, ref.leadId]).catch(() => {});
+    await pool.query(`DELETE FROM sales_escalations WHERE lead_id IN ($1,$2,$3,$4)`, [lid, t2, t3, ref.leadId]).catch(() => {});
+    await pool.query(`DELETE FROM sales_invoices WHERE lead_id = $1`, [lid]).catch(() => {});
+    await pool.query(`DELETE FROM activities WHERE lead_id IN ($1,$2,$3,$4)`, [lid, t2, t3, ref.leadId]).catch(() => {});
+    await pool.query(`DELETE FROM suppression_list WHERE email = $1`, [`${tag}t3@example.com`]).catch(() => {});
+    await pool.query(`DELETE FROM leads WHERE id IN ($1,$2,$3,$4)`, [ref.leadId, t3, t2, lid]).catch(() => {});
+    const gone = await pool.query(`SELECT count(*)::int n FROM leads WHERE email LIKE '%${tag}%'`);
+    ok("journey test data cleaned", gone.rows[0].n === 0);
   }
 
   await pool.end();

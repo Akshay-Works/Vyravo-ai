@@ -6,7 +6,7 @@
 // ============================================================================
 import { pool } from "@/db";
 import { logDecision } from "./schema";
-import { advanceStage } from "./stages";
+
 
 export interface BuyingSignals {
   budget: string | null; timeline: string | null;
@@ -49,7 +49,11 @@ export async function qualifyFromThread(leadId: number): Promise<BuyingSignals |
       autonomy: "L1", reason: `intent=${sig.intent} authority=${sig.authority} budget=${sig.budget ? "yes" : "no"} timeline=${sig.timeline ? "yes" : "no"}`,
       context: sig, result: qualified ? "qualified" : "not_yet" });
     if (qualified) {
-      try { await advanceStage(leadId, "qualified", `buying signals: intent ${sig.intent}/3, ${sig.authority}`, { trigger: "qualifyFromThread" }); } catch {}
+      try {
+        const { emitSalesEvent } = await import("./lifecycle");
+        await emitSalesEvent({ key: `qualified-${leadId}-${sig.intent}-${sig.authority}`, type: "LEAD_QUALIFIED", leadId,
+          payload: { reason: `buying signals: intent ${sig.intent}/3, ${sig.authority}` } });
+      } catch {}
     }
     // Negotiation watch: budget talk + open proposal = founder decision (L3).
     if (sig.budget) {

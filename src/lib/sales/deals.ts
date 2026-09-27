@@ -67,17 +67,17 @@ export async function syncProposalStages(): Promise<{ synced: number }> {
   for (const r of rows.rows as any[]) {
     const to = r.status === "sent" || r.status === "viewed" ? "proposal_sent"
       : r.status === "changes_requested" ? "negotiation"
-      : r.status === "accepted" ? "won"
+      : r.status === "accepted" ? "verbal_agreement" // accepted ≠ paid: invoice + payment still required
       : r.status === "rejected" ? "lost" : "nurture";
     try {
       const moved = await advanceStage(Number(r.lead_id), to, `proposal #${r.id} → ${r.status}`, { trigger: "syncProposalStages" });
       if (moved.moved) {
         synced++;
-        if (to === "won")
-          await createEscalation({ lead_id: Number(r.lead_id), kind: "deal_won",
-            title: `Deal WON (proposal #${r.id}) — start onboarding`,
-            detail: "Proposal accepted. Convert to client and trigger onboarding.",
-            recommendation: "Create client record + kick off onboarding." }).catch(() => {});
+        if (to === "verbal_agreement")
+          await createEscalation({ lead_id: Number(r.lead_id), kind: "invoice_approval",
+            title: `Proposal #${r.id} accepted — approve invoice`,
+            detail: "Prospect accepted the proposal. Verify agreed scope/price, then create + send the invoice to move toward payment.",
+            recommendation: "Create the invoice (Sales API) and send it after review." }).catch(() => {});
       }
     } catch {}
   }

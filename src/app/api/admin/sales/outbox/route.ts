@@ -47,6 +47,10 @@ export async function POST(request: NextRequest) {
       await pool.query(`UPDATE leads SET last_contacted_at = now() WHERE id = $1`, [row.lead_id]);
       await pool.query(`INSERT INTO activities (type, action, description, lead_id, created_at) VALUES ('lead','reply_sent',$2,$1,now())`,
         [row.lead_id, `L2 follow-up approved + sent — "${subject.slice(0, 70)}"`]).catch(() => {});
+      try {
+        const { emitSalesEvent } = await import("@/lib/sales/lifecycle");
+        await emitSalesEvent({ key: `reply-sent-outbox-${id}`, type: "REPLY_SENT", leadId: Number(row.lead_id), payload: { queueId: id } });
+      } catch { /* lifecycle is non-fatal */ }
     }
   }
   await pool.query(`UPDATE sales_escalations SET status = 'resolved', resolved_at = now(), resolved_by = 'admin'

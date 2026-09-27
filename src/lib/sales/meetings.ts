@@ -7,7 +7,7 @@
 import { pool } from "@/db";
 import { isCalendlyConfigured, listScheduledEvents } from "@/lib/calendly";
 import { ensureSalesSchema, logDecision, createEscalation } from "./schema";
-import { advanceStage } from "./stages";
+
 import { buildDiscoveryBrief } from "./brief";
 
 export const SALES_CALENDAR_URL =
@@ -88,7 +88,9 @@ export async function meetingTick(opts: { max?: number; budgetMs?: number } = {}
       await pool.query(`UPDATE meetings SET agenda = $2 WHERE id = $1`, [meetingId, brief]);
       await pool.query(`INSERT INTO activities (type, action, description, lead_id, created_at) VALUES ('lead','meeting_booked',$2,$1,now())`,
         [leadId, `Meeting booked (${ev.name || "Calendly"}) — brief generated, outreach stopped`]).catch(() => {});
-      await advanceStage(leadId, "meeting_booked", `meeting booked: ${ev.name || "Calendly"}`, { trigger: "meetingTick" });
+      const { emitSalesEvent } = await import("./lifecycle");
+      await emitSalesEvent({ key: `meeting-booked-${meetingId}`, type: "MEETING_BOOKED", leadId: Number(leadId),
+        payload: { reason: `meeting booked: ${ev.name || "Calendly"}` } });
       await createEscalation({ lead_id: leadId, kind: "meeting_booked",
         title: `Meeting booked — brief ready`,
         detail: `${name || email} booked ${ev.name || "a meeting"} at ${ev.startTime || "?"}. Discovery brief saved on the lead + meeting.`,

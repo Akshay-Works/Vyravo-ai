@@ -548,12 +548,13 @@ export async function processOutreachQueue(cfg: OutreachConfig): Promise<{ sent:
            WHERE id = $1`,
           [leadId, delay != null ? new Date(Date.now() + delay * 86400000) : null, fn]
         );
-        // Sales OS: first outreach sent → CONTACTED stage (best-effort).
+        // Sales OS: first outreach sent → OUTREACH_SENT lifecycle event (best-effort).
         if (fn === 0) {
           try {
-            const { advanceStage } = await import("../sales/stages");
-            await advanceStage(leadId, "contacted", "first outreach sent", { trigger: "processOutreachQueue" });
-          } catch { /* stage move must never break sending */ }
+            const { emitSalesEvent } = await import("../sales/lifecycle");
+            await emitSalesEvent({ key: `outreach-sent-${eventId}`, type: "OUTREACH_SENT", leadId,
+              payload: { channel: "email", messageId: (result as any).id || null } });
+          } catch { /* lifecycle must never break sending */ }
         }
       }
       sent++;
@@ -732,11 +733,14 @@ export async function markReplied(leadId: number, meta: ReplyMeta = {}): Promise
   } catch { /* activities table may not exist on some installs — non-fatal */ }
 
   console.log(`[REPLY] REPLY_RECEIVED lead=${leadId} first=${firstReply} msg=${String(normId || "").slice(0, 60)}`);
-  // Sales OS: a reply means ENGAGED (best-effort, never blocks the poller).
+  // Sales OS: reply → lifecycle EMAIL_RECEIVED (contacted/replied_to → replied loop).
   try {
-    const { advanceStage } = await import("../sales/stages");
-    await advanceStage(leadId, "engaged", "prospect replied", { trigger: "markReplied" });
-  } catch { /* stage move must never break reply handling */ }
+    const { emitSalesEvent } = await import("../sales/lifecycle");
+    await emitSalesEvent({
+      key: normId ? `email-recv-${normId}`.slice(0, 200) : `email-recv-${leadId}-${Date.now()}`,
+      type: "EMAIL_RECEIVED", leadId, payload: { firstReply },
+    });
+  } catch { /* lifecycle must never break reply handling */ }
   // Multichannel: an email reply pauses WA/LI sequences for this lead.
   try {
     const { pauseChannels } = await import("../sales/orchestrate");
