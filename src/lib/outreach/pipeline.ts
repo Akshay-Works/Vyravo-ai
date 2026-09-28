@@ -253,6 +253,7 @@ export async function discoverNewLeads(cfg: OutreachConfig): Promise<any[]> {
        AND l.email ~* '^[^@[:space:]]+@[^@[:space:]]+\\.[^@[:space:]]+$'
        AND COALESCE(l.status, 'active') NOT IN (${BLOCKED_STATUSES.map((_, i) => `$${i + 1}`).join(",")})
        AND COALESCE(l.lead_score, 0) >= $${BLOCKED_STATUSES.length + 1}
+       AND COALESCE(l.business_source, 'vyravo_ai') = 'vyravo_ai'
        AND NOT EXISTS (SELECT 1 FROM outreach_events e WHERE e.lead_id = l.id)
      ORDER BY l.contact_priority ASC NULLS LAST, l.lead_score DESC, l.id DESC
      LIMIT 200`,
@@ -589,6 +590,8 @@ export async function sendOutreachNow(leadId: number): Promise<{ ok: boolean; er
   if ((lead.rowCount ?? 0) === 0) return { ok: false, error: "Lead not found." };
   const l = lead.rows[0];
   if (BLOCKED_STATUSES.includes(String(l.status || ""))) return { ok: false, error: `Lead status is ${l.status} — not eligible.` };
+  if (String(l.business_source || "vyravo_ai") === "brandnest")
+    return { ok: false, error: "BrandNest clients are excluded from cold outreach — convert to a Vyravo opportunity first." };
   const email = String(l.email || "").trim();
   if (!EMAIL_RE.test(email)) return { ok: false, error: "Lead has no valid email address." };
 

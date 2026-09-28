@@ -78,8 +78,9 @@ export async function rescoreTick(opts: { max?: number } = {}): Promise<{ rescor
             (SELECT count(*)::int FROM outreach_events e WHERE e.lead_id = l.id AND e.status = 'sent') AS sent_count,
             (SELECT count(DISTINCT thread_id)::int FROM inbox_messages m WHERE m.lead_id = l.id) AS inbox_threads
      FROM leads l
-     WHERE COALESCE(l.status, 'active') NOT IN ('replied','won','lost','do_not_contact','skipped')
-        OR COALESCE(l.reply_received, false) = true
+     WHERE (COALESCE(l.status, 'active') NOT IN ('replied','won','lost','do_not_contact','skipped')
+        OR COALESCE(l.reply_received, false) = true)
+       AND COALESCE(l.business_source, 'vyravo_ai') <> 'brandnest'
      ORDER BY COALESCE(l.reply_received, false) DESC, l.id DESC LIMIT $1`, [max]);
   let rescored = 0, changed = 0;
   for (const l of rows.rows as any[]) {

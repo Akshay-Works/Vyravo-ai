@@ -21,6 +21,8 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
     );
   }
   const stage = String(lead.stage || "new");
+  const biz = String(lead.business_source || "vyravo_ai");
+  const bn = (await pool.query(`SELECT relationship_status FROM brandnest_clients WHERE lead_id = $1`, [leadId]).catch(() => ({ rows: [] as any[] }))).rows[0];
   const escs = (await pool.query(
     `SELECT id, kind, title, status, created_at FROM sales_escalations WHERE lead_id = $1 ORDER BY created_at DESC LIMIT 10`, [leadId]).catch(() => ({ rows: [] as any[] }))).rows;
   const open = escs.filter((e: any) => e.status === "open");
@@ -67,9 +69,17 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               {(lead.city || lead.country) ? ` · ${[lead.city, lead.country].filter(Boolean).join(", ")}` : ""}
             </p>
           </div>
-          <span className="rounded-full border border-primary/40 bg-primary/10 px-4 py-1.5 text-sm font-semibold text-primary">
-            {stageLabel(stage)}
-          </span>
+          <div className="flex flex-col items-end gap-2">
+            <span className="rounded-full border border-primary/40 bg-primary/10 px-4 py-1.5 text-sm font-semibold text-primary">
+              {stageLabel(stage)}
+            </span>
+            {(bn || biz !== "vyravo_ai") && (
+              <Link href={`/admin/brandnest/clients/${leadId}`}
+                className="rounded-full border border-purple-500/40 bg-purple-500/10 px-3 py-1 text-xs font-semibold text-purple-400 hover:underline">
+                🎨 BrandNest — {(bn?.relationship_status || "").replace(/_/g, " ") || biz}
+              </Link>
+            )}
+          </div>
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div className="rounded-lg border border-border bg-surface-2 p-3">

@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { db } from "@/db";
 import { leads } from "@/db/schema";
-import { desc, eq, or, isNull, count } from "drizzle-orm";
+import { desc, eq, or, isNull, count, and } from "drizzle-orm";
+import { businessLabel } from "@/lib/brandnest/schema";
 import { ensureContactPriorityColumn } from "@/lib/leads/quality";
 import { normalizeCity } from "@/lib/leads/city";
 
@@ -13,11 +14,13 @@ const scoreColor = (s: number) =>
   : s >= 60 ? "bg-amber-500/15 text-amber-400 border-amber-500/30"
   : "bg-zinc-500/15 text-zinc-400 border-zinc-500/30";
 
-export default async function CrmLeadsPage({ searchParams }: { searchParams: Promise<{ city?: string }> }) {
+export default async function CrmLeadsPage({ searchParams }: { searchParams: Promise<{ city?: string; business?: string }> }) {
   await ensureContactPriorityColumn(); // Lead Data Quality Rule
   // City-wise view: ?city=Pune filters to one city, ?city=__unknown shows rows with no city yet
+  // Business view: ?business=vyravo_ai|brandnest|brandnest_to_vyravo (default: all — unchanged behavior)
   const sp = await searchParams;
   const cityFilter = (sp?.city || "").trim();
+  const bizFilter = ["vyravo_ai", "brandnest", "brandnest_to_vyravo", "other"].includes(sp?.business || "") ? (sp!.business as string) : "";
   const cityCounts = await db.select({ city: leads.city, n: count() }).from(leads).groupBy(leads.city);
   const byCity = new Map<string, number>();
   let unknownCity = 0, totalLeads = 0;
@@ -28,11 +31,13 @@ export default async function CrmLeadsPage({ searchParams }: { searchParams: Pro
     byCity.set(norm, (byCity.get(norm) || 0) + c.n);
   }
   const cityList = [...byCity.entries()].sort((a, b) => b[1] - a[1]);
-  const rows = cityFilter === "__unknown"
-    ? await db.select().from(leads).where(or(isNull(leads.city), eq(leads.city, ""))).orderBy(desc(leads.createdAt)).limit(150)
-    : cityFilter
-      ? await db.select().from(leads).where(eq(leads.city, cityFilter)).orderBy(desc(leads.createdAt)).limit(150)
-      : await db.select().from(leads).orderBy(desc(leads.createdAt)).limit(150);
+  const conds: any[] = [];
+  if (cityFilter === "__unknown") conds.push(or(isNull(leads.city), eq(leads.city, "")));
+  else if (cityFilter) conds.push(eq(leads.city, cityFilter));
+  if (bizFilter) conds.push(eq(leads.businessSource, bizFilter));
+  const rows = conds.length
+    ? await db.select().from(leads).where(and(...conds)).orderBy(desc(leads.createdAt)).limit(150)
+    : await db.select().from(leads).orderBy(desc(leads.createdAt)).limit(150);
   const byStage = new Map<string, number>();
   rows.forEach((r) => byStage.set(r.stage || "new", (byStage.get(r.stage || "new") || 0) + 1));
 
@@ -66,6 +71,15 @@ export default async function CrmLeadsPage({ searchParams }: { searchParams: Pro
           </Link>
         )}
       </div>
+      <div className="flex flex-wrap gap-2">
+        <span className="px-1 py-1 text-xs text-grey-dark">Business:</span>
+        {([["", "All"], ["vyravo_ai", "Vyravo AI"], ["brandnest", "BrandNest Studio"], ["brandnest_to_vyravo", "BrandNest → Vyravo"]] as const).map(([v, label]) => (
+          <Link key={v} href={`/admin/crm/leads${v ? `?business=${v}` : ""}${v && cityFilter ? `&city=${encodeURIComponent(cityFilter)}` : !v && cityFilter ? `?city=${encodeURIComponent(cityFilter)}` : ""}`}
+            className={`rounded-full border px-3 py-1 text-xs font-semibold ${bizFilter === v ? "border-primary/50 bg-primary/10 text-white" : "border-border bg-surface text-grey hover:text-white"}`}>
+            {label}
+          </Link>
+        ))}
+      </div>
       <div className="overflow-x-auto rounded-xl border border-border bg-surface">
         <table className="w-full text-sm">
           <thead>
@@ -94,7 +108,12 @@ export default async function CrmLeadsPage({ searchParams }: { searchParams: Pro
                   <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${scoreColor(r.leadScore ?? 0)}`}>{r.leadScore ?? 0}</span>
                 </td>
                 <td className="p-3 text-grey">{normalizeCity(r.city) || "—"}</td>
-                <td className="p-3"><span className="rounded-full border border-border bg-surface-2 px-2 py-0.5 text-xs text-grey">{r.stage || "new"}</span></td>
+                <td className="p-3">
+                  <span className="rounded-full border border-border bg-surface-2 px-2 py-0.5 text-xs text-grey">{r.stage || "new"}</span>
+                  {(r as any).businessSource && (r as any).businessSource !== "vyravo_ai" && (
+                    <div className="mt-1"><span className="rounded-full border border-purple-500/40 bg-purple-500/10 px-2 py-0.5 text-[10px] text-purple-400">{businessLabel((r as any).businessSource)}</span></div>
+                  )}
+                </td>
                 <td className="p-3 text-grey">{r.source || "website"}</td>
                 <td className="p-3 text-grey-dark">{r.createdAt ? new Date(r.createdAt).toLocaleDateString("en-IN") : "—"}</td>
               </tr>

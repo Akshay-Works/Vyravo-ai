@@ -39,8 +39,15 @@ export async function GET(_request: NextRequest) {
             COALESCE(sum(amount) FILTER (WHERE status IN ('sent','pending')),0)::numeric AS pending
      FROM sales_invoices`).catch(() => ({ rows: [{ collected: 0, pending: 0 }] }));
 
+  // Separated revenue (additive field — existing `revenue` shape unchanged, Vyravo-only).
+  let split: any = null;
+  try {
+    const { getRevenueSplit } = await import("@/lib/brandnest/metrics");
+    split = await getRevenueSplit();
+  } catch {}
   return Response.json({
     ok: true, active, inactive, stuck: stuck.rows,
     revenue: { collected: Number(revenue.rows[0]?.collected || 0), pending: Number(revenue.rows[0]?.pending || 0) },
+    revenueSplit: split,
   });
 }

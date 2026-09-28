@@ -18,6 +18,7 @@ const NAV_ITEMS = [
   { href: "/admin/workflows", label: "Workflows", icon: "⚡" },
   { href: "/admin/portal/clients", label: "Portal Clients", icon: "👥" },
   { href: "/admin/proposals", label: "Proposals", icon: "📄" },
+  { href: "/admin/brandnest", label: "BrandNest Studio", icon: "🎨" },
   { href: "/admin/knowledge-base", label: "KB Dashboard", icon: "📊" },
   { href: "/admin/knowledge-base/documents", label: "Document Library", icon: "📚" },
   { href: "/admin/knowledge-base/documents/upload", label: "Upload", icon: "📤" },

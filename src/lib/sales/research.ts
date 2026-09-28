@@ -75,6 +75,7 @@ export async function researchTick(opts: { max?: number; budgetMs?: number } = {
        AND business_website IS NOT NULL AND TRIM(business_website) <> ''
        AND (signals IS NULL OR signals->>'fetched_at' IS NULL)
        AND COALESCE((signals->>'attempts')::int, 0) < 3
+       AND COALESCE(business_source, 'vyravo_ai') IN ('vyravo_ai','brandnest_to_vyravo')
      ORDER BY id DESC LIMIT $1`, [max]);
   for (const lead of cands.rows as any[]) {
     if (Date.now() - t0 > budget) { out.truncated = true; break; }
