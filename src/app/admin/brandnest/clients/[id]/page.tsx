@@ -4,7 +4,7 @@ import { getBrandNestClient } from "@/lib/brandnest/clients";
 import { listProjects } from "@/lib/brandnest/projects";
 import { BRANDNEST_STATUS_LABELS, REACTIVATION_LABELS, businessLabel } from "@/lib/brandnest/schema";
 import { stageLabel } from "@/lib/sales/stages";
-import { ConvertButton, ReactivateControls, AddProjectForm, OpportunityFlags } from "../../BrandNestActions";
+import { ConvertButton, ReactivateControls, AddProjectForm, OpportunityFlags, EditClientForm, DeleteClientButton, EditProjectForm } from "../../BrandNestActions";
 import { MarkPaidClient } from "../../BrandNestPay";
 
 export const dynamic = "force-dynamic";
@@ -103,7 +103,11 @@ export default async function BrandNestClientDetail({ params }: { params: Promis
         <div className="mt-4 space-y-4 border-t border-border pt-4">
           <OpportunityFlags leadId={leadId} current={c.vyravo_opportunity || "none"} categories={cats} />
           <ReactivateControls leadId={leadId} current={REACTIVATION_LABELS[c.reactivation_status] || c.reactivation_status} />
-          <ConvertButton leadId={leadId} already={converted} />
+          <div className="flex flex-wrap items-center gap-3">
+            <ConvertButton leadId={leadId} already={converted} />
+            <DeleteClientButton leadId={leadId} name={c.business_name || c.full_name || `#${leadId}`} />
+          </div>
+          <EditClientForm leadId={leadId} init={c} />
         </div>
       </div>
 
@@ -117,7 +121,10 @@ export default async function BrandNestClientDetail({ params }: { params: Promis
                 <span className="font-medium text-white">#{p.id} {p.service}</span>
                 <span className="text-grey"> — {p.currency} {p.amount} · {p.status}{p.payment_method ? ` · ${p.payment_method}` : ""}{p.payment_date ? ` · paid ${fmtD(p.payment_date)}` : ""}</span>
               </div>
-              {p.status !== "paid" && p.status !== "cancelled" && <MarkPaid id={p.id} />}
+              <div className="flex items-center gap-2">
+                {p.status !== "paid" && p.status !== "cancelled" && <MarkPaid id={p.id} />}
+                <EditProjectForm p={p} />
+              </div>
             </div>
           ))}
         </div>

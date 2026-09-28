@@ -112,6 +112,16 @@ async function main() {
     ok("opportunity filter", byOpp.some((r: any) => Number(r.id) === c1.leadId));
   }
 
+  console.log("revenue edit (ledger correction)");
+  {
+    await updateProject(p2.id, { amount: 6000 });
+    const agg2 = await getBrandNestClient(c1.leadId);
+    ok("edited amount recomputes revenue", Number(agg2.total_revenue) === 6200, String(agg2.total_revenue));
+    await pool.query(`UPDATE leads SET business_name = $2 WHERE id = $1`, [c1.leadId, `EditedCo ${tag}`]);
+    const ed = (await pool.query(`SELECT business_name FROM leads WHERE id = $1`, [c1.leadId])).rows[0];
+    ok("client edit persists", ed.business_name === `EditedCo ${tag}`);
+  }
+
   console.log("cleanup");
   {
     await pool.query(`DELETE FROM brandnest_projects WHERE lead_id = $1`, [c1.leadId]);

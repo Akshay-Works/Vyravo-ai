@@ -161,6 +161,147 @@ export function AddProjectForm({ leadId }: { leadId: number }) {
   );
 }
 
+export function EditClientForm({ leadId, init }: { leadId: number; init: any }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [f, setF] = useState({
+    name: init.full_name || "", company: init.business_name || "", email: init.email || "",
+    phone: init.phone || "", website: init.business_website || "", location: init.city || "",
+    relationshipStatus: init.relationship_status || "historical",
+    acquisitionSource: init.acquisition_source || "",
+    services: Array.isArray(init.services) ? init.services.join(", ") : "",
+    repeatValue: init.repeat_value ?? "", notes: init.brandnest_notes || "",
+    nextFollowUp: init.brandnest_next_follow_up ? new Date(init.brandnest_next_follow_up).toISOString().slice(0, 10) : "",
+  });
+  const [msg, setMsg] = useState("");
+  const set = (k: string) => (e: any) => setF({ ...f, [k]: e.target.value });
+  const submit = async () => {
+    setMsg("Saving…");
+    const j = await api(`/api/admin/brandnest/clients/${leadId}`, "PATCH", {
+      name: f.name, company: f.company, email: f.email, phone: f.phone, website: f.website, location: f.location,
+      relationshipStatus: f.relationshipStatus, acquisitionSource: f.acquisitionSource || undefined,
+      services: f.services.split(",").map((s: string) => s.trim()).filter(Boolean),
+      repeatValue: f.repeatValue === "" ? null : Number(f.repeatValue),
+      notes: f.notes, nextFollowUp: f.nextFollowUp || null,
+    });
+    if (j.ok) { setMsg("Saved."); setOpen(false); router.refresh(); }
+    else setMsg(j.error || "failed");
+  };
+  if (!open) {
+    return (
+      <span className="flex items-center gap-2">
+        <button onClick={() => { setOpen(true); setMsg(""); }} className="rounded-lg border border-border bg-surface-2 px-4 py-2 text-xs font-semibold text-white">✏️ Edit client</button>
+        {msg && <span className="text-xs text-grey">{msg}</span>}
+      </span>
+    );
+  }
+  const input = "rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm text-white";
+  return (
+    <div className="space-y-2 rounded-lg border border-border bg-surface-2/50 p-3">
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        <input value={f.name} onChange={set("name")} placeholder="Client name" className={input} />
+        <input value={f.company} onChange={set("company")} placeholder="Company" className={input} />
+        <input value={f.email} onChange={set("email")} placeholder="Email" className={input} />
+        <input value={f.phone} onChange={set("phone")} placeholder="Phone" className={input} />
+        <input value={f.website} onChange={set("website")} placeholder="Website" className={input} />
+        <input value={f.location} onChange={set("location")} placeholder="Location" className={input} />
+        <select value={f.relationshipStatus} onChange={set("relationshipStatus")} className={input}>
+          {["historical", "reactivation_candidate", "contacted", "reply_received", "requirement_identified", "quoted", "active_project", "delivered", "payment_pending", "paid", "repeat_client", "inactive", "converted_to_vyravo"].map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
+        <input value={f.acquisitionSource} onChange={set("acquisitionSource")} placeholder="Acquisition source" className={input} />
+        <input value={f.services} onChange={set("services")} placeholder="Services (comma separated)" className={input} />
+        <input value={f.repeatValue} onChange={set("repeatValue")} placeholder="Repeat-work value (₹)" type="number" className={input} />
+        <input value={f.nextFollowUp} onChange={set("nextFollowUp")} type="date" className={input} />
+      </div>
+      <textarea value={f.notes} onChange={set("notes")} placeholder="Notes" rows={2} className={`${input} w-full`} />
+      <div className="flex items-center gap-2">
+        <button onClick={submit} className="rounded-lg border border-primary/40 bg-primary/10 px-4 py-2 text-xs font-semibold text-primary">Save</button>
+        <button onClick={() => setOpen(false)} className="rounded-lg border border-border bg-surface-2 px-4 py-2 text-xs text-grey">Cancel</button>
+        {msg && <span className="text-xs text-grey">{msg}</span>}
+      </div>
+    </div>
+  );
+}
+
+export function DeleteClientButton({ leadId, name }: { leadId: number; name: string }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const go = async () => {
+    if (busy) return;
+    if (!confirm(`Remove BrandNest record for "${name}"?\n\nProjects + BrandNest data are deleted. The contact itself is kept if it has any Vyravo history.`)) return;
+    setBusy(true);
+    const j = await api(`/api/admin/brandnest/clients/${leadId}`, "DELETE");
+    setBusy(false);
+    if (j.ok) {
+      alert(j.note || "Removed.");
+      router.push("/admin/brandnest/clients");
+      router.refresh();
+    } else alert(j.error || "Delete failed.");
+  };
+  return (
+    <button onClick={go} disabled={busy} className="rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-2 text-xs font-semibold text-red-400 disabled:opacity-40">
+      {busy ? "…" : "🗑 Delete"}
+    </button>
+  );
+}
+
+export function EditProjectForm({ p }: { p: any }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [f, setF] = useState({
+    service: p.service || "", amount: String(p.amount ?? ""), status: p.status || "pending",
+    paymentMethod: p.payment_method || "", paymentDate: p.payment_date ? new Date(p.payment_date).toISOString().slice(0, 10) : "",
+    deliveryDate: p.delivery_date ? new Date(p.delivery_date).toISOString().slice(0, 10) : "", notes: p.notes || "",
+  });
+  const [msg, setMsg] = useState("");
+  const set = (k: string) => (e: any) => setF({ ...f, [k]: e.target.value });
+  const submit = async () => {
+    setMsg("Saving…");
+    const j = await api(`/api/admin/brandnest/projects/${p.id}`, "PATCH", {
+      service: f.service, amount: Number(f.amount), status: f.status,
+      paymentMethod: f.paymentMethod, paymentDate: f.paymentDate || null,
+      deliveryDate: f.deliveryDate || null, notes: f.notes,
+    });
+    if (j.ok) { setMsg(""); setOpen(false); router.refresh(); }
+    else setMsg(j.error || "failed");
+  };
+  const del = async () => {
+    if (!confirm(`Delete project #${p.id} (${p.service} — ${p.currency} ${p.amount})? This is a ledger correction and will change revenue totals.`)) return;
+    const j = await api(`/api/admin/brandnest/projects/${p.id}`, "DELETE");
+    if (j.ok) router.refresh();
+    else alert(j.error || "Delete failed.");
+  };
+  if (!open) {
+    return (
+      <span className="flex gap-2">
+        <button onClick={() => setOpen(true)} className="rounded-lg border border-border bg-surface-2 px-3 py-1 text-xs text-grey hover:text-white">Edit</button>
+        <button onClick={del} className="rounded-lg border border-red-500/30 bg-red-500/5 px-3 py-1 text-xs text-red-400/80 hover:text-red-400">Delete</button>
+      </span>
+    );
+  }
+  const input = "rounded-lg border border-border bg-surface-2 px-2 py-1.5 text-xs text-white";
+  return (
+    <div className="w-full space-y-2 rounded-lg border border-border bg-surface-2/50 p-2">
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        <input value={f.service} onChange={set("service")} placeholder="Service" className={input} />
+        <input value={f.amount} onChange={set("amount")} placeholder="Amount" type="number" className={input} />
+        <select value={f.status} onChange={set("status")} className={input}>
+          {["pending", "partially_paid", "paid", "refunded", "cancelled"].map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
+        <input value={f.paymentMethod} onChange={set("paymentMethod")} placeholder="Method" className={input} />
+        <input value={f.paymentDate} onChange={set("paymentDate")} type="date" className={input} />
+        <input value={f.deliveryDate} onChange={set("deliveryDate")} type="date" className={input} />
+        <input value={f.notes} onChange={set("notes")} placeholder="Notes" className={`${input} col-span-2`} />
+      </div>
+      <div className="flex items-center gap-2">
+        <button onClick={submit} className="rounded-lg border border-primary/40 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">Save</button>
+        <button onClick={() => setOpen(false)} className="rounded-lg border border-border bg-surface-2 px-3 py-1 text-xs text-grey">Cancel</button>
+        {msg && <span className="text-xs text-grey">{msg}</span>}
+      </div>
+    </div>
+  );
+}
+
 export function OpportunityFlags({ leadId, current, categories }: { leadId: number; current: string; categories: string[] }) {
   const router = useRouter();
   const [msg, setMsg] = useState("");
