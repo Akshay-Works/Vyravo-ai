@@ -299,6 +299,86 @@ async function main() {
     ok("journey test data cleaned", gone.rows[0].n === 0);
   }
 
+  console.log("conversion batch (live DB, cleaned)");
+  {
+    const { assignVariant } = await import("@/lib/sales/experiments");
+    const off = await assignVariant("test-exp-xyz", 402);
+    ok("unknown experiment inert", !off.enrolled && off.variant === "control");
+    const tag = `cv${Date.now()}`;
+    const tmp = (await pool.query(
+      `INSERT INTO leads (full_name, email, business_name, stage, status, source) VALUES ($1,$2,$3,'new','active','conv-test') RETURNING id`,
+      [`Conv Test`, `${tag}@example.com`, `ConvCo`])).rows[0].id;
+    const { buildOutreachEmail } = await import("@/lib/outreach/pipeline");
+    const lead = (await pool.query(`SELECT * FROM leads WHERE id = $1`, [tmp])).rows[0];
+    const intro = await buildOutreachEmail(lead, 0);
+    const asg = await pool.query(`SELECT variant FROM sales_experiment_assignments WHERE experiment = 'fu0_subject' AND lead_id = $1`, [tmp]);
+    const variant = asg.rows[0]?.variant;
+    ok("intro enrolls in subject test", !!variant, variant || "none");
+    ok("subject matches variant", variant === "challenger" ? intro.subject.includes("(2 min)") : intro.subject.length > 5, intro.subject.slice(0, 50));
+    const fu3 = await buildOutreachEmail(lead, 3);
+    ok("FU3 breakup template", fu3.subject.includes("Closing the loop"), fu3.subject.slice(0, 50));
+    await pool.query(`DELETE FROM sales_experiment_assignments WHERE experiment = 'fu0_subject' AND lead_id = $1`, [tmp]);
+    await pool.query(`DELETE FROM leads WHERE id = $1`, [tmp]);
+  }
+  console.log("auto-invoice + no-show (live DB, cleaned)");
+  {
+    const { emitSalesEvent } = await import("@/lib/sales/lifecycle");
+    const tag = `ai${Date.now()}`;
+    // cap OFF → manual approval path (existing behavior)
+    await pool.query(`INSERT INTO outreach_config (k, v) VALUES ('auto_invoice_max','0') ON CONFLICT (k) DO UPDATE SET v = '0'`);
+    const l1 = (await pool.query(`INSERT INTO leads (full_name, email, stage, status, source) VALUES ('AI1','${tag}a@example.com','negotiation','active','conv-test') RETURNING id`)).rows[0].id;
+    await emitSalesEvent({ key: `${tag}-ag1`, type: "AGREEMENT_DETECTED", leadId: Number(l1), payload: { confidence: 0.95, evidence: "yes proceed for Rs 20000" } });
+    const s1 = (await pool.query(`SELECT stage FROM leads WHERE id = $1`, [l1])).rows[0].stage;
+    const e1 = await pool.query(`SELECT 1 FROM sales_escalations WHERE lead_id = $1 AND kind = 'deal_won'`, [l1]);
+    const i1 = await pool.query(`SELECT 1 FROM sales_invoices WHERE lead_id = $1`, [l1]);
+    ok("cap off → verbal + approval, no invoice", s1 === "verbal_agreement" && (e1.rowCount ?? 0) > 0 && (i1.rowCount ?? 0) === 0);
+    // cap ON → under-cap agreement auto-invoices
+    await pool.query(`UPDATE outreach_config SET v = '25000' WHERE k = 'auto_invoice_max'`);
+    const l2 = (await pool.query(`INSERT INTO leads (full_name, email, stage, status, source) VALUES ('AI2','${tag}b@example.com','negotiation','active','conv-test') RETURNING id`)).rows[0].id;
+    await emitSalesEvent({ key: `${tag}-ag2`, type: "AGREEMENT_DETECTED", leadId: Number(l2), payload: { confidence: 0.95, evidence: "yes proceed for Rs 20000" } });
+    const s2 = (await pool.query(`SELECT stage FROM leads WHERE id = $1`, [l2])).rows[0].stage;
+    const inv = await pool.query(`SELECT status, provider FROM sales_invoices WHERE lead_id = $1`, [l2]);
+    ok("cap on → auto-invoiced to payment_pending", s2 === "payment_pending" && inv.rows[0]?.status === "sent", `${s2}/${inv.rows[0]?.status}`);
+    // over-cap → back to manual
+    const l3 = (await pool.query(`INSERT INTO leads (full_name, email, stage, status, source) VALUES ('AI3','${tag}c@example.com','negotiation','active','conv-test') RETURNING id`)).rows[0].id;
+    await emitSalesEvent({ key: `${tag}-ag3`, type: "AGREEMENT_DETECTED", leadId: Number(l3), payload: { confidence: 0.95, evidence: "yes proceed for Rs 90000" } });
+    const i3 = await pool.query(`SELECT 1 FROM sales_invoices WHERE lead_id = $1`, [l3]);
+    ok("over-cap → manual approval", (i3.rowCount ?? 0) === 0);
+    await pool.query(`UPDATE outreach_config SET v = '0' WHERE k = 'auto_invoice_max'`);
+    // no-show sweep
+    const l4 = (await pool.query(`INSERT INTO leads (full_name, email, stage, status, source) VALUES ('NS','${tag}d@example.com','meeting_booked','active','conv-test') RETURNING id`)).rows[0].id;
+    await pool.query(`INSERT INTO meetings (title, lead_id, scheduled_at, duration, status) VALUES ('Test call',$1, now() - interval '3 hours', 30, 'scheduled')`, [l4]);
+    const { noShowTick } = await import("@/lib/sales/meetings");
+    const ns1 = await noShowTick({ max: 5 });
+    const held = await pool.query(`SELECT 1 FROM email_queue WHERE lead_id = $1 AND status = 'held' AND email_type = 'no_show_followup'`, [l4]);
+    const mst = (await pool.query(`SELECT status FROM meetings WHERE lead_id = $1`, [l4])).rows[0].status;
+    ok("no-show → held draft + flagged", ns1.flagged >= 1 && (held.rowCount ?? 0) > 0 && mst === "no_show");
+    const ns2 = await noShowTick({ max: 5 });
+    const held2 = await pool.query(`SELECT count(*)::int n FROM email_queue WHERE lead_id = $1 AND email_type = 'no_show_followup'`, [l4]);
+    ok("no-show idempotent", held2.rows[0].n === 1, `flagged=${ns2.flagged}`);
+    // one-click proposal pieces (draft → sent → stage; email path reuses proven sender)
+    const { generateSalesProposal } = await import("@/lib/sales/deals");
+    const { setProposalStatus } = await import("@/lib/proposals/engine");
+    const gp = await generateSalesProposal(Number(l4), { notes: "conv test" });
+    await setProposalStatus(gp.proposalId, "sent");
+    await emitSalesEvent({ key: `${tag}-ps`, type: "PROPOSAL_SENT", leadId: Number(l4), payload: { proposalId: gp.proposalId } });
+    const ps = (await pool.query(`SELECT stage FROM leads WHERE id = $1`, [l4])).rows[0].stage;
+    ok("proposal sent → proposal_sent", ps === "proposal_sent", ps);
+    // cleanup
+    await pool.query(`DELETE FROM email_queue WHERE lead_id IN ($1,$2,$3,$4)`, [l1, l2, l3, l4]);
+    await pool.query(`DELETE FROM meetings WHERE lead_id IN ($1,$2,$3,$4)`, [l1, l2, l3, l4]);
+    await pool.query(`DELETE FROM sales_invoices WHERE lead_id IN ($1,$2,$3,$4)`, [l1, l2, l3, l4]);
+    await pool.query(`DELETE FROM proposals WHERE lead_id IN ($1,$2,$3,$4)`, [l1, l2, l3, l4]);
+    await pool.query(`DELETE FROM sales_events WHERE lead_id IN ($1,$2,$3,$4)`, [l1, l2, l3, l4]);
+    await pool.query(`DELETE FROM sales_decisions WHERE lead_id IN ($1,$2,$3,$4)`, [l1, l2, l3, l4]);
+    await pool.query(`DELETE FROM sales_escalations WHERE lead_id IN ($1,$2,$3,$4)`, [l1, l2, l3, l4]);
+    await pool.query(`DELETE FROM activities WHERE lead_id IN ($1,$2,$3,$4)`, [l1, l2, l3, l4]);
+    await pool.query(`DELETE FROM leads WHERE id IN ($1,$2,$3,$4)`, [l1, l2, l3, l4]);
+    const gone = await pool.query(`SELECT count(*)::int n FROM leads WHERE email LIKE '%${tag}%'`);
+    const capBack = (await pool.query(`SELECT v FROM outreach_config WHERE k = 'auto_invoice_max'`)).rows[0]?.v;
+    ok("conv tests cleaned + cap reset", gone.rows[0].n === 0 && capBack === "0");
+  }
+
   await pool.end();
   console.log(`\nRESULT: ${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);

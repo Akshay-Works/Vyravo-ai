@@ -20,6 +20,7 @@ export function getPaymentProvider(): PaymentProvider {
 
 export interface CreateCheckoutInput {
   proposalId: number;
+  salesInvoiceId?: number;
   amount: number;
   currency: string;
   description: string;
@@ -69,6 +70,7 @@ async function createStripeCheckout(input: CreateCheckoutInput): Promise<Checkou
         success_url: input.successUrl,
         cancel_url: input.cancelUrl,
         "metadata[proposalId]": String(input.proposalId),
+        ...(input.salesInvoiceId ? { "metadata[salesInvoiceId]": String(input.salesInvoiceId) } : {}),
         "metadata[milestone]": input.milestoneLabel || "",
       }),
       signal: AbortSignal.timeout(10000),

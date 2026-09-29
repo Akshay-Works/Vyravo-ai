@@ -106,3 +106,50 @@ export async function meetingTick(opts: { max?: number; budgetMs?: number } = {}
   }
   return { checked, booked };
 }
+
+/**
+ * No-show sweep: scheduled meetings that ended 2h+ ago with no notes.
+ * Never auto-sends — drafts a held rebook email (L2 approval) + escalates.
+ * Idempotent: flagged meetings flip to 'no_show' and never re-flag.
+ */
+export async function noShowTick(opts: { max?: number } = {}): Promise<{ flagged: number }> {
+  await ensureSalesSchema();
+  const max = Math.min(Math.max(opts.max || 5, 1), 20);
+  const rows = await pool.query(
+    `SELECT m.id, m.lead_id, m.title, m.scheduled_at, l.email, l.business_name, l.full_name
+     FROM meetings m JOIN leads l ON l.id = m.lead_id
+     WHERE m.status = 'scheduled' AND m.scheduled_at < now() - interval '2 hours'
+       AND (m.summary IS NULL OR m.summary = '')
+     ORDER BY m.scheduled_at DESC LIMIT $1`, [max]);
+  let flagged = 0;
+  for (const mtg of rows.rows as any[]) {
+    try {
+      const leadId = Number(mtg.lead_id);
+      const nm = mtg.business_name || mtg.full_name || "there";
+      const esc = (s: any) => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").slice(0, 200);
+      if (mtg.email) {
+        const subject = `Sorry we missed each other — new time?`;
+        const html = `<p>Hi ${esc(nm)},</p><p>Looks like we missed each other earlier. No worries at all — you can pick a new time here: <a href="${SALES_CALENDAR_URL}">${SALES_CALENDAR_URL}</a></p><p>If the timing isn't right, just reply and let me know.</p><p>— Akshay, Vyravo AI</p>`;
+        const ins = await pool.query(
+          `INSERT INTO email_queue (lead_id, email_type, scheduled_for, status, template_data, created_at)
+           VALUES ($1,'no_show_followup', now(), 'held', $2, now()) RETURNING id`,
+          [leadId, JSON.stringify({ to: mtg.email, subject, html, leadId, meetingId: mtg.id })]);
+        await createEscalation({ lead_id: leadId, kind: "email_approval",
+          title: `No-show follow-up needs approval (outbox #${ins.rows[0].id})`,
+          detail: `Meeting "${mtg.title}" passed with no notes. Rebook draft held for review.`,
+          recommendation: "Approve in Sales → Outbox to re-engage, or discard." });
+      }
+      await createEscalation({ lead_id: leadId, kind: "meeting_no_show",
+        title: `📅 Possible no-show: ${String(nm).slice(0, 60)}`,
+        detail: `Meeting "${mtg.title}" (${mtg.scheduled_at}) has no notes.`,
+        recommendation: "Confirm no-show vs held-without-notes; approve the rebook draft if needed." });
+      await pool.query(`UPDATE meetings SET status = 'no_show', updated_at = now() WHERE id = $1`, [mtg.id]);
+      await pool.query(`UPDATE leads SET next_action = 'No-show follow-up drafted — approve in outbox', next_action_date = now() + interval '1 day' WHERE id = $1`, [leadId]).catch(() => {});
+      await logDecision({ lead_id: leadId, trigger_text: "noShowTick", action: "no_show_flagged",
+        autonomy: "L2", reason: `meeting #${mtg.id} passed without notes — held draft, not sent`,
+        context: { meetingId: mtg.id }, result: "flagged" });
+      flagged++;
+    } catch { /* one bad meeting never breaks the sweep */ }
+  }
+  return { flagged };
+}

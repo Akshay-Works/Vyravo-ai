@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getBrandNestMetrics, getRevenueSplit } from "@/lib/brandnest/metrics";
-import { SearchBox, AddClientForm } from "./BrandNestActions";
+import { SearchBox, AddClientForm, ScoreAllButton } from "./BrandNestActions";
 
 export const dynamic = "force-dynamic";
 
@@ -71,7 +71,10 @@ export default async function BrandNestDashboard() {
 
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="rounded-xl border border-border bg-surface p-5">
-          <h2 className="text-sm font-semibold text-white">Top opportunities (repeat + Vyravo-fit)</h2>
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold text-white">Top opportunities (repeat + Vyravo-fit)</h2>
+            <ScoreAllButton />
+          </div>
           <div className="mt-3 space-y-2">
             {m.topOpportunities.length === 0 && <p className="text-sm text-grey">No flagged opportunities yet.</p>}
             {m.topOpportunities.map((o: any) => (

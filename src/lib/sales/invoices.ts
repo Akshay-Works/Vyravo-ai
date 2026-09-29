@@ -14,7 +14,7 @@ function invoiceNo(): string {
 }
 
 export async function createInvoice(leadId: number, opts: {
-  amount: number; currency?: string; proposalId?: number | null; dueDays?: number; paymentLink?: string | null;
+  amount: number; currency?: string; proposalId?: number | null; dueDays?: number; paymentLink?: string | null; quiet?: boolean;
 }): Promise<{ id: number; invoiceNo: string }> {
   await ensureSalesSchema();
   if (!(opts.amount > 0)) throw new Error("invoice requires a positive amount");
@@ -32,12 +32,14 @@ export async function createInvoice(leadId: number, opts: {
     reason: `invoice ${no} drafted (${opts.currency || "INR"} ${opts.amount}) — founder approval required`,
     context: { invoiceId: id, proposalId: opts.proposalId }, result: "drafted",
   });
-  await createEscalation({
-    lead_id: leadId, kind: "invoice_approval",
-    title: `🧾 Invoice ${no} ready to send (${opts.currency || "INR"} ${opts.amount})`,
-    detail: `Drafted from the agreed deal. Verify amount, scope and payment link before sending.`,
-    recommendation: "Approve in Sales → Founder Actions, then send.",
-  });
+  if (!opts.quiet) {
+    await createEscalation({
+      lead_id: leadId, kind: "invoice_approval",
+      title: `🧾 Invoice ${no} ready to send (${opts.currency || "INR"} ${opts.amount})`,
+      detail: `Drafted from the agreed deal. Verify amount, scope and payment link before sending.`,
+      recommendation: "Approve in Sales → Founder Actions, then send.",
+    });
+  }
   return { id, invoiceNo: no };
 }
 
@@ -48,6 +50,23 @@ export async function sendInvoice(invoiceId: number, actor = "admin"): Promise<v
   if (!inv) throw new Error("invoice not found");
   if (!["draft", "sent"].includes(String(inv.status))) throw new Error(`cannot send invoice in status ${inv.status}`);
   await pool.query(`UPDATE sales_invoices SET status = 'sent', updated_at = now() WHERE id = $1`, [invoiceId]);
+  // Stripe fast path: a real payment link the moment STRIPE_SECRET_KEY exists.
+  try {
+    const { getPaymentProvider, createCheckoutSession } = await import("@/lib/proposals/payment");
+    if (getPaymentProvider().id === "stripe") {
+      const lead = (await pool.query(`SELECT email FROM leads WHERE id = $1`, [inv.lead_id])).rows[0];
+      const base = (process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://vyravo-ai.vercel.app")).replace(/\/$/, "");
+      const co = await createCheckoutSession({
+        proposalId: inv.proposal_id || inv.id, salesInvoiceId: inv.id,
+        amount: Number(inv.amount), currency: inv.currency,
+        description: `Vyravo invoice ${inv.invoice_no}`, clientEmail: lead?.email || "",
+        successUrl: `${base}/?invoice_paid=${inv.invoice_no}`, cancelUrl: `${base}/?invoice_cancelled=${inv.invoice_no}`,
+      });
+      if (co.ok && co.checkoutUrl) {
+        await pool.query(`UPDATE sales_invoices SET payment_link = $2, provider = 'stripe', updated_at = now() WHERE id = $1`, [invoiceId, co.checkoutUrl]);
+      }
+    }
+  } catch { /* stripe failure: manual-link path unchanged */ }
   await logDecision({
     lead_id: inv.lead_id, trigger_text: "invoice", action: "invoice_sent", autonomy: "none",
     reason: `invoice ${inv.invoice_no} sent by ${actor}`, context: { invoiceId }, result: "sent",

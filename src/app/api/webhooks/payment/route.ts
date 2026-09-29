@@ -28,7 +28,8 @@ export async function POST(request: NextRequest) {
     const eventType = payload.type || payload.event_type || "payment_received";
     const amount = payload.amount || payload.data?.object?.amount || 0;
     const currency = payload.currency || payload.data?.object?.currency || "usd";
-    const invoiceId = payload.invoice_id || payload.data?.object?.metadata?.proposalId || null;
+    const md = payload.data?.object?.metadata || {};
+    const invoiceId = payload.invoice_id || md.salesInvoiceId || md.proposalId || null;
 
     // Idempotent: eventId is used as paymentId in the workflow key
     await emitEvent("payment_received", {

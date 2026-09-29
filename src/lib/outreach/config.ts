@@ -20,7 +20,7 @@ export const DEFAULT_CONFIG: OutreachConfig = {
   test_mode: false,
   test_recipient: "akshay.navale.work@gmail.com",
   daily_limit: 30,
-  follow_up_days: [3, 7],
+  follow_up_days: [3, 7, 14],
   min_gap_secs: 20,
   min_score: 60,
 };

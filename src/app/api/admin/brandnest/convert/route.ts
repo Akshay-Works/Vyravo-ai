@@ -11,7 +11,17 @@ export async function POST(request: NextRequest) {
     const b = await request.json().catch(() => ({}));
     if (!Number(b.leadId)) return Response.json({ error: "leadId required" }, { status: 400 });
     const r = await convertToVyravo(Number(b.leadId), { categories: b.categories, opportunity: b.opportunity, note: b.note });
-    return Response.json({ ok: true, ...r });
+    let proposalId: number | null = null;
+    if (b.draftProposal && !r.already) {
+      try {
+        const { generateSalesProposal } = await import("@/lib/sales/deals");
+        const p = await generateSalesProposal(Number(b.leadId), { notes: "Auto-drafted on BrandNest → Vyravo conversion (warm client)." });
+        proposalId = p.proposalId;
+      } catch (e: any) {
+        return Response.json({ ok: true, ...r, proposalId: null, proposalError: String(e?.message || e).slice(0, 200) });
+      }
+    }
+    return Response.json({ ok: true, ...r, proposalId });
   } catch (e: any) {
     return Response.json({ error: String(e?.message || e).slice(0, 300) }, { status: 400 });
   }

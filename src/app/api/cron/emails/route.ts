@@ -85,6 +85,14 @@ export async function GET(request: NextRequest) {
     } catch (e: any) {
       meetings = { booked: 0, error: String(e?.message || e).slice(0, 160) };
     }
+    // No-show sweep — held rebook drafts (L2), never auto-sent.
+    let noShows: any = { flagged: 0 };
+    try {
+      const { noShowTick } = await import("@/lib/sales/meetings");
+      noShows = await noShowTick({ max: 5 });
+    } catch (e: any) {
+      noShows = { flagged: 0, error: String(e?.message || e).slice(0, 160) };
+    }
     // Morning sales report — yesterday's numbers emailed to the founder.
     let reportMail = "skipped";
     try {

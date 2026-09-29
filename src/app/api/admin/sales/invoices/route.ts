@@ -28,6 +28,12 @@ export async function POST(request: NextRequest) {
       const r = await createInvoice(leadId, { amount, currency: b.currency || "INR", proposalId: b.proposalId ? Number(b.proposalId) : null });
       return Response.json({ ok: true, ...r });
     }
+    if (action === "set_cap") {
+      const cap = Math.max(0, Math.round(Number(b.cap) || 0));
+      const { pool } = await import("@/db");
+      await pool.query(`INSERT INTO outreach_config (k, v) VALUES ('auto_invoice_max', $1) ON CONFLICT (k) DO UPDATE SET v = $1`, [String(cap)]);
+      return Response.json({ ok: true, auto_invoice_max: cap, note: cap > 0 ? `Agreements ≤ ${cap} auto-invoice.` : "Auto-invoice OFF — all invoices need approval." });
+    }
     if (action === "send") {
       const invoiceId = Number(b.invoiceId);
       if (!invoiceId) return Response.json({ error: "invoiceId required" }, { status: 400 });

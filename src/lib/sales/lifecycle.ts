@@ -191,6 +191,29 @@ async function route(type: string, leadId: number | null, p: Record<string, any>
         return "low-confidence agreement → escalated, no move";
       }
       const r = await advanceStage(leadId, "verbal_agreement", `explicit agreement (${conf.toFixed(2)})`, { trigger: "AGREEMENT_DETECTED" });
+      // Auto-invoice fast path: standard packages under the founder's cap skip the wait.
+      try {
+        const capRow = await pool.query(`SELECT v FROM outreach_config WHERE k = 'auto_invoice_max'`);
+        const cap = Number(capRow.rows[0]?.v || 0);
+        let amount = Number(p.amount || 0);
+        if (!amount && p.evidence) {
+          const { extractRequestedPrice } = await import("./negotiate");
+          amount = extractRequestedPrice(String(p.evidence))?.amount || 0;
+        }
+        if (!amount) {
+          const prop = await pool.query(`SELECT total FROM proposals WHERE lead_id = $1 AND status NOT IN ('draft','rejected','expired','archived') ORDER BY id DESC LIMIT 1`, [leadId]);
+          amount = Number(prop.rows[0]?.total || 0);
+        }
+        if (cap > 0 && amount > 0 && amount <= cap) {
+          const { createInvoice, sendInvoice } = await import("./invoices");
+          const inv = await createInvoice(leadId, { amount, currency: String(p.currency || "INR"), quiet: true });
+          await sendInvoice(inv.id, "auto");
+          await logDecision({ lead_id: leadId, trigger_text: "AGREEMENT_DETECTED", action: "auto_invoiced",
+            autonomy: "L1", reason: `agreement ${amount} ≤ cap ${cap} — invoiced without wait`, context: { invoiceId: inv.id }, result: "invoiced" });
+          await setNextAction(leadId, await currentStage(leadId));
+          return `verbal_agreement + auto-invoiced ${amount} (under cap ${cap})`;
+        }
+      } catch { /* auto-invoice failure: fall through to manual approval */ }
       await createEscalation({
         lead_id: leadId, kind: "deal_won",
         title: "🔥 Prospect wants to proceed — approve invoice",

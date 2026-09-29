@@ -4,7 +4,7 @@ import { getBrandNestClient } from "@/lib/brandnest/clients";
 import { listProjects } from "@/lib/brandnest/projects";
 import { BRANDNEST_STATUS_LABELS, REACTIVATION_LABELS, businessLabel } from "@/lib/brandnest/schema";
 import { stageLabel } from "@/lib/sales/stages";
-import { ConvertButton, ReactivateControls, AddProjectForm, OpportunityFlags, EditClientForm, DeleteClientButton, EditProjectForm } from "../../BrandNestActions";
+import { ConvertButton, ConvertAndDraftButton, ReactivateControls, AddProjectForm, OpportunityFlags, EditClientForm, DeleteClientButton, EditProjectForm, DraftReactivationButton } from "../../BrandNestActions";
 import { MarkPaidClient } from "../../BrandNestPay";
 
 export const dynamic = "force-dynamic";
@@ -105,6 +105,8 @@ export default async function BrandNestClientDetail({ params }: { params: Promis
           <ReactivateControls leadId={leadId} current={REACTIVATION_LABELS[c.reactivation_status] || c.reactivation_status} />
           <div className="flex flex-wrap items-center gap-3">
             <ConvertButton leadId={leadId} already={converted} />
+            <ConvertAndDraftButton leadId={leadId} already={converted} />
+            <DraftReactivationButton leadId={leadId} />
             <DeleteClientButton leadId={leadId} name={c.business_name || c.full_name || `#${leadId}`} />
           </div>
           <EditClientForm leadId={leadId} init={c} />

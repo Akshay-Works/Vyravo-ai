@@ -122,14 +122,41 @@ async function main() {
     ok("client edit persists", ed.business_name === `EditedCo ${tag}`);
   }
 
+  console.log("score-all + warm drafts");
+  {
+    const { scoreAllReactivation, draftReactivationEmail } = await import("@/lib/brandnest/reactivate");
+    const c3 = await upsertBrandNestClient({ name: `BN Draft ${tag}`, company: `DraftCo ${tag}`, email: `draft-${tag}@example.com` });
+    await createProject({ leadId: c3.leadId, service: "Test Design", amount: 15000, status: "paid", paymentMethod: "UPI" });
+    const sweep = await scoreAllReactivation();
+    const st3 = (await pool.query(`SELECT reactivation_status FROM brandnest_clients WHERE lead_id = $1`, [c3.leadId])).rows[0];
+    ok("score-all marks paid history ready", sweep.ready >= 1 && st3.reactivation_status === "ready", `${sweep.scored}/${sweep.ready}`);
+    const d1 = await draftReactivationEmail(c3.leadId);
+    ok("warm draft held", !!d1.id && !d1.skipped);
+    const heldBn = await pool.query(`SELECT template_data FROM email_queue WHERE id = $1`, [d1.id]);
+    const td = heldBn.rows[0]?.template_data || {};
+    ok("draft references past work + correct recipient", td.to === `draft-${tag}@example.com` && String(td.html || "").includes("Test Design"));
+    const d2 = await draftReactivationEmail(c3.leadId);
+    ok("second draft skipped (approval pending)", !d2.id && !!d2.skipped, d2.skipped || "");
+    await setReactivation(c3.leadId, "do_not_contact");
+    await pool.query(`UPDATE sales_escalations SET status = 'resolved' WHERE lead_id = $1 AND kind = 'email_approval'`, [c3.leadId]);
+    const d3 = await draftReactivationEmail(c3.leadId);
+    ok("DNC blocks drafts", !d3.id && d3.skipped === "Do Not Contact");
+    // stash for cleanup
+    (global as any).__bn3 = c3.leadId;
+    await pool.query(`DELETE FROM email_queue WHERE lead_id = $1`, [c3.leadId]);
+  }
+
   console.log("cleanup");
   {
-    await pool.query(`DELETE FROM brandnest_projects WHERE lead_id = $1`, [c1.leadId]);
-    await pool.query(`DELETE FROM brandnest_clients WHERE lead_id = $1`, [c1.leadId]);
-    await pool.query(`DELETE FROM sales_escalations WHERE lead_id = $1`, [c1.leadId]);
-    await pool.query(`DELETE FROM sales_decisions WHERE lead_id = $1`, [c1.leadId]);
-    await pool.query(`DELETE FROM activities WHERE lead_id = $1`, [c1.leadId]);
-    await pool.query(`DELETE FROM leads WHERE id = $1`, [c1.leadId]);
+    const extra = (global as any).__bn3 ? [c1.leadId, (global as any).__bn3] : [c1.leadId];
+    for (const lid of extra) {
+      await pool.query(`DELETE FROM brandnest_projects WHERE lead_id = $1`, [lid]);
+      await pool.query(`DELETE FROM brandnest_clients WHERE lead_id = $1`, [lid]);
+      await pool.query(`DELETE FROM sales_escalations WHERE lead_id = $1`, [lid]);
+      await pool.query(`DELETE FROM sales_decisions WHERE lead_id = $1`, [lid]);
+      await pool.query(`DELETE FROM activities WHERE lead_id = $1`, [lid]);
+      await pool.query(`DELETE FROM leads WHERE id = $1`, [lid]);
+    }
     const gone = await pool.query(`SELECT count(*)::int n FROM leads WHERE email = $1`, [email]);
     ok("test data cleaned", gone.rows[0].n === 0);
     const split = await getRevenueSplit();

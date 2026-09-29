@@ -104,6 +104,16 @@ const OUTREACH_TEMPLATES: { type: string; name: string; subject: string; body: s
       "<p style=\"margin:0 0 24px;\">Either way, I'll leave you with one thought — {{point1}}</p>" +
       "<p style=\"margin:0 0 24px;\">Worth a 15-minute call this week? If not, just reply &ldquo;not now&rdquo; and I'll close the loop — no hard feelings.</p>",
   },
+  {
+    type: "outreach-followup-3",
+    name: "Outreach — Breakup (automated)",
+    subject: "Closing the loop — {{company}}",
+    body:
+      "<p style=\"margin:0 0 16px;\">{{greeting}}</p>" +
+      "<p style=\"margin:0 0 16px;\">I've reached out a few times about {{services}} for <strong>{{company}}</strong>, so I'll take the silence as &ldquo;not now&rdquo; and stop emailing after this.</p>" +
+      "<p style=\"margin:0 0 16px;\">If timing ever changes, just reply — I'm one email away, and the first call is always a working session on your business, never a pitch.</p>" +
+      "<p style=\"margin:0 0 24px;\">And if anyone in your network is drowning in missed enquiries or manual follow-ups, I'd be grateful for an introduction.</p>",
+  },
 ];
 
 export async function ensureOutreachTemplates(): Promise<void> {
@@ -119,7 +129,7 @@ export async function ensureOutreachTemplates(): Promise<void> {
 }
 
 async function templateFor(followUpNumber: number): Promise<{ subject: string; body: string }> {
-  const type = followUpNumber === 0 ? "outreach-intro" : followUpNumber === 1 ? "outreach-followup-1" : "outreach-followup-2";
+  const type = followUpNumber === 0 ? "outreach-intro" : followUpNumber === 1 ? "outreach-followup-1" : followUpNumber === 2 ? "outreach-followup-2" : "outreach-followup-3";
   const r = await pool.query(`SELECT subject, body FROM email_templates WHERE email_type = $1 AND is_active = true ORDER BY id DESC LIMIT 1`, [type]);
   if ((r.rowCount ?? 0) === 0) {
     const t = OUTREACH_TEMPLATES.find((x) => x.type === type)!;
@@ -186,7 +196,17 @@ export async function buildOutreachEmail(lead: any, followUpNumber = 0): Promise
     : data.point1.charAt(0).toLowerCase() + data.point1.slice(1);
   data.provable = data.point1;         // legacy template variable
   const preheader = (data.point1 + " " + String(data.services || "")).replace(/<[^>]+>/g, "").slice(0, 110);
-  const subject = renderTemplate(tpl.subject, data);
+  let subject = renderTemplate(tpl.subject, data);
+  // Experiment 'fu0_subject': challenger subject for intro emails (no-op unless active).
+  if (followUpNumber === 0 && lead?.id) {
+    try {
+      const { assignVariant } = await import("../sales/experiments");
+      const a = await assignVariant("fu0_subject", Number(lead.id));
+      if (a.enrolled && a.variant === "challenger") {
+        subject = renderTemplate("Idea for {{company}} (2 min)", data);
+      }
+    } catch { /* experiment failure: fail open (control subject) */ }
+  }
   let inner = renderTemplate(tpl.body, data, { html: true });
   // drop paragraphs left empty by missing optional points (e.g. {{point2}})
   inner = inner.replace(/<p\b[^>]*>(?:&nbsp;|\s|[.\,\!\?\-\u2013\u2014])*<\/p>/gi, "");

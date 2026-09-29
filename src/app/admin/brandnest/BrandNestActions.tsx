@@ -76,6 +76,73 @@ export function AddClientForm() {
   );
 }
 
+export function ScoreAllButton() {
+  const router = useRouter();
+  const [msg, setMsg] = useState("");
+  const [busy, setBusy] = useState(false);
+  const go = async () => {
+    if (busy) return;
+    setBusy(true);
+    const j = await api("/api/admin/brandnest/reactivate", "POST", { action: "score_all" });
+    setMsg(j.ok ? `Scored ${j.scored} clients → ${j.ready} ready for reactivation.` : (j.error || "failed"));
+    setBusy(false);
+    router.refresh();
+  };
+  return (
+    <span className="flex items-center gap-2">
+      <button onClick={go} disabled={busy} className="rounded-lg border border-border bg-surface-2 px-3 py-1.5 text-xs text-grey hover:text-white disabled:opacity-40">
+        {busy ? "Scoring…" : "⚡ Score all for reactivation"}
+      </button>
+      {msg && <span className="text-xs text-grey">{msg}</span>}
+    </span>
+  );
+}
+
+export function DraftReactivationButton({ leadId }: { leadId: number }) {
+  const router = useRouter();
+  const [msg, setMsg] = useState("");
+  const [busy, setBusy] = useState(false);
+  const go = async () => {
+    if (busy) return;
+    setBusy(true);
+    const j = await api("/api/admin/brandnest/reactivate", "POST", { leadId, action: "draft" });
+    setMsg(j.ok ? `Draft #${j.id} held in Sales → Outbox for your approval.` : (j.skipped ? `Skipped: ${j.skipped}` : (j.error || "failed")));
+    setBusy(false);
+    if (j.ok) router.refresh();
+  };
+  return (
+    <span className="flex items-center gap-2">
+      <button onClick={go} disabled={busy} className="rounded-lg border border-primary/40 bg-primary/10 px-4 py-2 text-xs font-semibold text-primary disabled:opacity-40">
+        {busy ? "…" : "✉️ Draft reactivation email"}
+      </button>
+      {msg && <span className="text-xs text-grey">{msg}</span>}
+    </span>
+  );
+}
+
+export function ConvertAndDraftButton({ leadId, already }: { leadId: number; already: boolean }) {
+  const router = useRouter();
+  const [msg, setMsg] = useState("");
+  const [busy, setBusy] = useState(false);
+  if (already) return null;
+  const go = async () => {
+    if (busy || !confirm("Convert to Vyravo opportunity AND draft a proposal? No outreach will be queued; the proposal lands as a draft for approval.")) return;
+    setBusy(true);
+    const j = await api("/api/admin/brandnest/convert", "POST", { leadId, draftProposal: true });
+    setMsg(j.ok ? `Converted${j.proposalId ? ` + proposal #${j.proposalId} drafted` : ""}.` : (j.error || "failed"));
+    setBusy(false);
+    if (j.ok) router.refresh();
+  };
+  return (
+    <span className="flex items-center gap-2">
+      <button onClick={go} disabled={busy} className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-2 text-xs font-semibold text-amber-400 disabled:opacity-40">
+        {busy ? "…" : "🌉 Convert + draft proposal"}
+      </button>
+      {msg && <span className="text-xs text-grey">{msg}</span>}
+    </span>
+  );
+}
+
 export function ConvertButton({ leadId, already }: { leadId: number; already: boolean }) {
   const router = useRouter();
   const [msg, setMsg] = useState("");

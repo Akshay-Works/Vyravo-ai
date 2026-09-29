@@ -76,7 +76,8 @@ export async function researchTick(opts: { max?: number; budgetMs?: number } = {
        AND (signals IS NULL OR signals->>'fetched_at' IS NULL)
        AND COALESCE((signals->>'attempts')::int, 0) < 3
        AND COALESCE(business_source, 'vyravo_ai') IN ('vyravo_ai','brandnest_to_vyravo')
-     ORDER BY id DESC LIMIT $1`, [max]);
+       AND COALESCE(lead_score, 0) >= 60
+     ORDER BY lead_score DESC, id DESC LIMIT $1`, [max]);
   for (const lead of cands.rows as any[]) {
     if (Date.now() - t0 > budget) { out.truncated = true; break; }
     const attempts = Number(lead.signals?.attempts || 0) + 1;
