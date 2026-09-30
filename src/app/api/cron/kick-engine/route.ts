@@ -46,27 +46,13 @@ export async function GET(request: NextRequest) {
       return Response.json({ error: `GitHub dispatch failed (${r.status})`, detail: text.slice(0, 200) }, { status: 502 });
     }
 
-    // Funnel 2 (LinkedIn + email/web discovery) — dispatched on the same Vercel
-    // cron since GitHub schedules are flaky. Uses the workflow file name.
-    let funnel2: any = { skipped: true, reason: "no GITHUB_ACTIONS_TOKEN variant" };
-    try {
-      const r2 = await fetch(
-        `https://api.github.com/repos/${ENGINE_REPO}/actions/workflows/funnel2-daily.yml/dispatches`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${ghToken}`,
-            Accept: "application/vnd.github+json",
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ ref: "main" }),
-          signal: AbortSignal.timeout(15000),
-        }
-      );
-      funnel2 = r2.ok ? { dispatched: "funnel2-daily.yml" } : { error: `funnel2 dispatch failed (${r2.status})` };
-    } catch (e2: any) {
-      funnel2 = { error: e2.message };
-    }
+    // Funnel 2 + Foreign run on CIRCLECI via the watchdog below — NOT dispatched
+    // here. (Sep 2026: GitHub's 2,000 free minutes died on the 20th running all
+    // 3 engines 2×/day. GitHub now runs ONLY the daily engine ≈900 min/mo;
+    // CircleCI covers funnel2+foreign ≈2,100 of its 6,000 free min/mo.)
+    // The watchdog sees no GitHub SUCCESS for run_funnel2/run_foreign and
+    // triggers the CircleCI mirror for them every morning. Nothing to do here.
+    const funnel2: any = { skipped: true, reason: "runs on CircleCI via watchdog (GitHub minutes reserved for daily engine)" };
     console.log("kick-engine funnel2:", JSON.stringify(funnel2));
     // ---- CIRCLECI OVERFLOW WATCHDOG (never fatal) -----------------------
     // If any engine workflow missed SUCCESS yesterday (quota exhaustion,
