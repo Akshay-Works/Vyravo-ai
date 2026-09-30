@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { Logo } from "@/components/Logo";
 
 const NAV_ITEMS = [
+  { href: "/admin/employees", label: "Employees", icon: "🧑‍💼" },
   { href: "/admin/analytics", label: "Analytics", icon: "📊" },
   { href: "/admin/visitors", label: "Visitors", icon: "👀" },
   { href: "/admin/crm/clients", label: "CRM", icon: "👥" },

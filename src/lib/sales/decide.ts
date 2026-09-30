@@ -172,5 +172,9 @@ export async function salesTick(opts: { max?: number; budgetMs?: number } = {}):
     const { syncProposalStages } = await import("./deals");
     await syncProposalStages();
   } catch {}
+  try {
+    const { autoCallTaskTick } = await import("@/lib/sales-workspace/ops");
+    await autoCallTaskTick(5);
+  } catch { /* handoff is non-fatal */ }
   return { nurtured, open_escalations: Number(open.rows[0]?.n || 0), truncated: (cands.rowCount ?? 0) >= max, rescored, scoreChanged };
 }

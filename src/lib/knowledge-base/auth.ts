@@ -58,17 +58,33 @@ export async function getAdminSession(): Promise<AdminSession | null> {
     const sessionId = store.get(SESSION_COOKIE)?.value;
     if (!sessionId) return null;
 
-    const res = await pool.query(
-      `SELECT s.user_id, s.expires_at, u.email, u.name, u.role, u.space_id, u.is_active
-       FROM kb_sessions s
-       JOIN kb_users u ON u.id = s.user_id
-       WHERE s.id = $1`,
-      [sessionId]
-    );
+    // RBAC: workspace_role scopes sessions (NULL/legacy = full admin).
+    // Fault-tolerant: if the column doesn't exist yet, fall back to legacy.
+    let res;
+    try {
+      res = await pool.query(
+        `SELECT s.user_id, s.expires_at, u.email, u.name, u.role, u.space_id, u.is_active, u.workspace_role
+         FROM kb_sessions s
+         JOIN kb_users u ON u.id = s.user_id
+         WHERE s.id = $1`,
+        [sessionId]
+      );
+    } catch {
+      res = await pool.query(
+        `SELECT s.user_id, s.expires_at, u.email, u.name, u.role, u.space_id, u.is_active
+         FROM kb_sessions s
+         JOIN kb_users u ON u.id = s.user_id
+         WHERE s.id = $1`,
+        [sessionId]
+      );
+    }
     if (res.rowCount === 0) return null;
     const row = res.rows[0];
     if (new Date(row.expires_at).getTime() < Date.now()) return null;
     if (!row.is_active) return null;
+    // Employee sessions (sales/social) are valid logins but NOT admin sessions.
+    const wr = String(row.workspace_role ?? "").toLowerCase();
+    if (wr === "sales" || wr === "social") return null;
 
     return {
       userId: row.user_id,
