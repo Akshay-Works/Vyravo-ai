@@ -52,7 +52,13 @@ export async function createSession(
   return sessionId;
 }
 
-export async function getAdminSession(): Promise<AdminSession | null> {
+export interface AnySession extends AdminSession {
+  userId: number | null;
+  workspaceRole: string | null;
+}
+
+/** Raw session lookup — ANY valid login (admin + employees). RBAC layer decides. */
+export async function getAnySession(): Promise<AnySession | null> {
   try {
     const store = await cookies();
     const sessionId = store.get(SESSION_COOKIE)?.value;
@@ -82,9 +88,6 @@ export async function getAdminSession(): Promise<AdminSession | null> {
     const row = res.rows[0];
     if (new Date(row.expires_at).getTime() < Date.now()) return null;
     if (!row.is_active) return null;
-    // Employee sessions (sales/social) are valid logins but NOT admin sessions.
-    const wr = String(row.workspace_role ?? "").toLowerCase();
-    if (wr === "sales" || wr === "social") return null;
 
     return {
       userId: row.user_id,
@@ -92,10 +95,20 @@ export async function getAdminSession(): Promise<AdminSession | null> {
       name: row.name || "Vyravo Admin",
       role: (row.role || "admin") as AdminSession["role"],
       spaceId: row.space_id != null ? Number(row.space_id) : null,
+      workspaceRole: row.workspace_role != null ? String(row.workspace_role) : null,
     };
   } catch {
     return null;
   }
+}
+
+/** Admin-only session: employee (sales/social) sessions return null here. */
+export async function getAdminSession(): Promise<AdminSession | null> {
+  const s = await getAnySession();
+  if (!s) return null;
+  const wr = String(s.workspaceRole ?? "").toLowerCase();
+  if (wr === "sales" || wr === "social") return null; // valid login, NOT admin
+  return s;
 }
 
 export async function isAdminAuthenticated(): Promise<boolean> {

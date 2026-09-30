@@ -8,7 +8,7 @@
 // queries are scoped in SQL (unauthorized rows never leave the database).
 // ============================================================================
 import { pool } from "@/db";
-import { getAdminSession } from "@/lib/knowledge-base/auth";
+import { getAnySession } from "@/lib/knowledge-base/auth";
 import { hashPassword } from "@/lib/portal/auth";
 
 export type WorkspaceRole = "admin" | "sales" | "social";
@@ -112,7 +112,7 @@ export async function ensureRbacSchema(): Promise<void> {
 
 /** Resolve the current session to a workspace user (null = logged out). */
 export async function getCurrentUser(): Promise<CurrentUser | null> {
-  const s = await getAdminSession();
+  const s = await getAnySession();
   if (!s || !s.userId) return null;
   try {
     const r = await pool.query(`SELECT id, email, name, workspace_role, is_active FROM kb_users WHERE id = $1`, [s.userId]);
