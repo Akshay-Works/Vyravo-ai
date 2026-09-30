@@ -64,25 +64,31 @@ export async function GET(request: NextRequest) {
         await import("@/lib/outreach/circleci-overflow");
       const y = await githubEngineSuccessYesterday(ghToken);
       overflow = { checked: y.ok, date: y.date, github: y.success };
+      // FAIL-OPEN (Oct 2026): if GitHub's API can't be reached, state is
+      // UNKNOWN — trigger all 3 on CircleCI rather than risk a silent
+      // no-run day. Worst case (GitHub healthy + API blip) is one day of
+      // double API spend; the already-ran guards + dedupe bound the damage.
+      let missing: string[];
       if (!y.ok) {
-        overflow.check = y.error;
+        overflow.check = `${y.error || "github check failed"} — failing open, triggering all 3`;
+        missing = ["run_daily", "run_funnel2", "run_foreign"];
       } else {
-        const missing = OVERFLOW_WORKFLOWS.filter((w) => !y.success[w.param]).map((w) => w.param);
-        if (missing.length === 0) {
-          overflow.overflow = { skipped: "github healthy" };
+        missing = OVERFLOW_WORKFLOWS.filter((w) => !y.success[w.param]).map((w) => w.param);
+      }
+      if (missing.length === 0) {
+        overflow.overflow = { skipped: "github healthy" };
+      } else {
+        const cci = (process.env.CIRCLECI_API_TOKEN || "").trim();
+        if (!cci) {
+          overflow.overflow = { skipped: "CIRCLECI_API_TOKEN not set", missing };
         } else {
-          const cci = (process.env.CIRCLECI_API_TOKEN || "").trim();
-          if (!cci) {
-            overflow.overflow = { skipped: "CIRCLECI_API_TOKEN not set", missing };
-          } else {
-            const t = await triggerCircleCIOverflow(cci, {
-              run_daily: missing.includes("run_daily"),
-              run_funnel2: missing.includes("run_funnel2"),
-              run_foreign: missing.includes("run_foreign"),
-              send: "1",
-            });
-            overflow.overflow = { missing, ...t };
-          }
+          const t = await triggerCircleCIOverflow(cci, {
+            run_daily: missing.includes("run_daily"),
+            run_funnel2: missing.includes("run_funnel2"),
+            run_foreign: missing.includes("run_foreign"),
+            send: "1",
+          });
+          overflow.overflow = { missing, ...t };
         }
       }
     } catch (e: any) {
