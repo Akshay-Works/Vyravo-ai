@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { isAdminAuthenticated } from "@/lib/knowledge-base/auth";
+import { hashPassword } from "@/lib/portal/auth";
 import { pool } from "@/db";
 import {
   ensureRbacSchema, getCurrentUser, createEmployee, setEmployeeStatus,
@@ -54,6 +55,14 @@ export async function POST(request: NextRequest) {
         if (Number(b.id) === me.id) throw new Error("you cannot change your own role");
         await setEmployeeRole(Number(b.id), b.role);
         await audit({ userId: me.id, role: me.role, action: "admin.employee_role", object: "user", objectId: b.id, next: { role: b.role } });
+        return Response.json({ ok: true });
+      }
+      case "reset_pw": {
+        const pw = String(b.password || "");
+        if (pw.length < 8) throw new Error("password must be 8+ characters");
+        await pool.query(`UPDATE kb_users SET password_hash = $2, updated_at = now() WHERE id = $1`, [Number(b.id), hashPassword(pw)]);
+        await pool.query(`DELETE FROM kb_sessions WHERE user_id = $1`, [Number(b.id)]); // force re-login
+        await audit({ userId: me.id, role: me.role, action: "admin.employee_pw_reset", object: "user", objectId: b.id });
         return Response.json({ ok: true });
       }
       case "assign":

@@ -100,6 +100,10 @@ export default function EmployeesPage() {
                         const r = prompt("Role (admin/sales/social):", e.workspace_role);
                         if (r) act(() => post({ action: "role", id: e.id, role: r }), "role updated");
                       }} className="rounded bg-surface px-2 py-1 text-[11px]">Role</button>
+                      <button onClick={() => {
+                        const p = prompt(`New password for ${e.name} (8+ characters):`);
+                        if (p) act(() => post({ action: "reset_pw", id: e.id, password: p }), "password reset — share it with them securely");
+                      }} className="rounded bg-surface px-2 py-1 text-[11px]">Reset PW</button>
                     </span>
                   </div>
                   <div className="mt-1 text-xs text-grey">
