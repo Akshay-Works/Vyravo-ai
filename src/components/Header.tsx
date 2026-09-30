@@ -88,6 +88,12 @@ export function Header() {
           </nav>
 
           <div className="hidden lg:flex items-center gap-3">
+            <Link
+              href="/login"
+              className="px-3 py-2 text-sm text-grey hover:text-white transition-colors rounded-lg hover:bg-white/5"
+            >
+              Login
+            </Link>
             <a
               href={SITE_LINKS.discoveryCall}
               target="_blank"
@@ -157,7 +163,14 @@ export function Header() {
                 </Link>
               )
             )}
-            <div className="pt-3 border-t border-border">
+            <div className="pt-3 border-t border-border space-y-2">
+              <Link
+                href="/login"
+                className="block px-4 py-3 text-sm text-center text-grey hover:text-white hover:bg-white/5 rounded-lg transition-colors"
+                onClick={() => setMobileOpen(false)}
+              >
+                Login
+              </Link>
               <a
                 href={SITE_LINKS.discoveryCall}
                 target="_blank"
