@@ -26,7 +26,8 @@ export async function ensurePresenceSchema(): Promise<void> {
   await pool.query(`
     INSERT INTO employee_sessions (user_id, session_id, logged_in_at, last_seen_at, ip, user_agent)
     SELECT DISTINCT ON (s.user_id) s.user_id, s.id, COALESCE(s.created_at, now()),
-           COALESCE(u.last_active_at, s.created_at, now()), s.ip, s.user_agent
+           GREATEST(COALESCE(u.last_active_at, s.created_at, now()), COALESCE(s.created_at, now())),
+           s.ip, s.user_agent
     FROM kb_sessions s
     JOIN kb_users u ON u.id = s.user_id
     WHERE s.expires_at > now() AND s.user_id IS NOT NULL
@@ -108,7 +109,7 @@ export async function listLoginHistory(limit = 200): Promise<any[]> {
   const r = await pool.query(
     `SELECT s.id, s.user_id, u.name, u.email, COALESCE(u.workspace_role,'admin') AS workspace_role,
             s.logged_in_at, s.last_seen_at, s.logged_out_at, s.end_reason, s.ip,
-            EXTRACT(EPOCH FROM (COALESCE(s.logged_out_at, s.last_seen_at) - s.logged_in_at))::int AS duration_secs,
+            GREATEST(0, EXTRACT(EPOCH FROM (COALESCE(s.logged_out_at, s.last_seen_at) - s.logged_in_at))::int) AS duration_secs,
             (s.logged_out_at IS NULL AND s.last_seen_at > now() - interval '10 minutes') AS is_online
      FROM employee_sessions s
      JOIN kb_users u ON u.id = s.user_id

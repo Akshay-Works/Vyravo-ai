@@ -231,9 +231,9 @@ export async function listEmployees(): Promise<any[]> {
             ls.logged_in_at AS session_started_at,
             ls.last_seen_at AS session_last_seen,
             ls.logged_out_at AS session_ended_at,
-            EXTRACT(EPOCH FROM (COALESCE(ls.logged_out_at, ls.last_seen_at) - ls.logged_in_at))::int AS last_session_secs,
+            GREATEST(0, EXTRACT(EPOCH FROM (COALESCE(ls.logged_out_at, ls.last_seen_at) - ls.logged_in_at))::int) AS last_session_secs,
             (ls.logged_out_at IS NULL AND ls.last_seen_at > now() - interval '10 minutes') AS is_online,
-            (SELECT COALESCE(SUM(EXTRACT(EPOCH FROM (COALESCE(s.logged_out_at, s.last_seen_at) - s.logged_in_at))),0)::int
+            (SELECT COALESCE(SUM(GREATEST(0, EXTRACT(EPOCH FROM (COALESCE(s.logged_out_at, s.last_seen_at) - s.logged_in_at)))),0)::int)
                FROM employee_sessions s
               WHERE s.user_id = u.id
                 AND timezone('Asia/Kolkata', s.logged_in_at)::date = timezone('Asia/Kolkata', now())::date
