@@ -21,6 +21,17 @@ export async function ensurePresenceSchema(): Promise<void> {
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_emp_sess_user_time ON employee_sessions(user_id, logged_in_at DESC)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_emp_sess_open ON employee_sessions(user_id) WHERE logged_out_at IS NULL`);
   await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS uq_emp_sess_sid ON employee_sessions(session_id)`);
+  // One-time: seed the latest still-valid cookie per user so the Logins tab
+  // isn't empty until they next sign in.
+  await pool.query(`
+    INSERT INTO employee_sessions (user_id, session_id, logged_in_at, last_seen_at, ip, user_agent)
+    SELECT DISTINCT ON (s.user_id) s.user_id, s.id, COALESCE(s.created_at, now()),
+           COALESCE(u.last_active_at, s.created_at, now()), s.ip, s.user_agent
+    FROM kb_sessions s
+    JOIN kb_users u ON u.id = s.user_id
+    WHERE s.expires_at > now() AND s.user_id IS NOT NULL
+    ORDER BY s.user_id, s.created_at DESC NULLS LAST
+    ON CONFLICT (session_id) DO NOTHING`);
 }
 
 export async function recordLogin(userId: number, sessionId: string, ip?: string | null, userAgent?: string | null): Promise<void> {
