@@ -10,15 +10,42 @@ async function post(body: any) {
   return j;
 }
 
+function fmtWhen(iso: string | null | undefined) {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+}
+function fmtDur(secs: number | null | undefined) {
+  const s = Math.max(0, Math.round(Number(secs) || 0));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m`;
+  return `${s}s`;
+}
+function presenceLine(e: any) {
+  const today = e.today_secs ? ` · today ${fmtDur(e.today_secs)}` : "";
+  if (e.is_online) {
+    const live = e.session_started_at
+      ? Math.round((Date.now() - new Date(e.session_started_at).getTime()) / 1000)
+      : e.last_session_secs;
+    return `🟢 Online since ${fmtWhen(e.session_started_at)} · ${fmtDur(live)}${today}`;
+  }
+  if (e.session_started_at) {
+    return `⚪ Last login ${fmtWhen(e.session_started_at)} · stayed ${fmtDur(e.last_session_secs)}${today}`;
+  }
+  if (e.last_login_at) return `⚪ Last login ${fmtWhen(e.last_login_at)}${today}`;
+  return "⚪ Never logged in";
+}
+
 export default function EmployeesPage() {
-  const [tab, setTab] = useState<"sales" | "social" | "activity" | "approvals">("sales");
-  const [d, setD] = useState<any>({ employees: [], activity: [], approvals: [] });
+  const [tab, setTab] = useState<"sales" | "social" | "logins" | "activity" | "approvals">("sales");
+  const [d, setD] = useState<any>({ employees: [], activity: [], approvals: [], logins: [] });
   const [msg, setMsg] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [f, setF] = useState({ name: "", email: "", password: "", role: "sales" });
   const [assign, setAssign] = useState({ leadIds: "", userId: "" });
 
-  const tabParam = (t: string) => (t === "activity" ? "activity" : t === "approvals" ? "approvals" : "team");
+  const tabParam = (t: string) => (t === "activity" || t === "approvals" || t === "logins" ? t : "team");
   const load = async (t: string) => {
     const r = await fetch(`/api/admin/employees?tab=${tabParam(t)}`);
     const j = await r.json();
@@ -55,10 +82,10 @@ export default function EmployeesPage() {
       </div>
 
       <div className="flex gap-1">
-        {(["sales", "social", "activity", "approvals"] as const).map((t) => (
+        {(["sales", "social", "logins", "activity", "approvals"] as const).map((t) => (
           <button key={t} onClick={() => setTab(t)}
             className={`rounded-lg px-3 py-1.5 text-xs font-semibold capitalize ${tab === t ? "bg-primary text-white" : "bg-surface-2 text-grey"}`}>
-            {t === "sales" ? `📞 Sales (${sales.length})` : t === "social" ? `🎨 Social (${social.length})` : t === "activity" ? "🧾 Activity" : `⏳ Approvals (${d.approvals.length})`}
+            {t === "sales" ? `📞 Sales (${sales.length})` : t === "social" ? `🎨 Social (${social.length})` : t === "logins" ? "⏱ Logins" : t === "activity" ? "🧾 Activity" : `⏳ Approvals (${d.approvals.length})`}
           </button>
         ))}
         <button onClick={() => setShowCreate((s) => !s)} className="ml-auto rounded-lg bg-surface-2 px-3 py-1.5 text-xs font-semibold text-primary">
@@ -109,8 +136,8 @@ export default function EmployeesPage() {
                   <div className="mt-1 text-xs text-grey">
                     👥 {e.assigned_leads ?? 0} leads · 📌 {e.open_tasks ?? 0} open tasks
                     {tab === "social" ? ` · ✅ ${e.open_content_tasks ?? 0} content tasks` : ""}
-                    {e.last_active_at ? ` · last active ${new Date(e.last_active_at).toLocaleString("en-IN")}` : " · never active"}
                   </div>
+                  <div className="mt-0.5 text-xs text-grey">{presenceLine(e)}</div>
                   {tab === "sales" && (
                     <Link href={`/sales/performance?userId=${e.id}`} className="text-[11px] text-primary">View performance →</Link>
                   )}
@@ -141,10 +168,49 @@ export default function EmployeesPage() {
           <div className="rounded-xl border border-border bg-surface p-4">
             <h2 className="mb-2 text-sm font-semibold">👑 Admins ({admins.length})</h2>
             {admins.map((e: any) => (
-              <p key={e.id} className="text-xs text-grey">{e.name} ({e.email}){e.is_active ? "" : " — disabled"}</p>
+              <p key={e.id} className="text-xs text-grey">{e.name} ({e.email}){e.is_active ? "" : " — disabled"} · {presenceLine(e)}</p>
             ))}
           </div>
         </>
+      )}
+
+      {tab === "logins" && (
+        <div className="rounded-xl border border-border bg-surface p-4">
+          <h2 className="mb-2 text-sm font-semibold">⏱ Login history (times in IST)</h2>
+          <p className="mb-3 text-[11px] text-grey">Each row is one login. Duration is how long they stayed in the app (until logout or last activity).</p>
+          <div className="max-h-[70vh] overflow-auto">
+            <table className="w-full min-w-[640px] text-left text-xs">
+              <thead className="sticky top-0 bg-surface text-[11px] uppercase text-grey-dark">
+                <tr>
+                  <th className="py-2 pr-2">Employee</th>
+                  <th className="py-2 pr-2">Logged in</th>
+                  <th className="py-2 pr-2">Left / last seen</th>
+                  <th className="py-2 pr-2">Stayed</th>
+                  <th className="py-2 pr-2">Status</th>
+                  <th className="py-2">IP</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(d.logins || []).map((s: any) => (
+                  <tr key={s.id} className="border-t border-border">
+                    <td className="py-2 pr-2">
+                      <div className="font-semibold">{s.name}</div>
+                      <div className="text-[11px] text-grey">{s.email} · {s.workspace_role}</div>
+                    </td>
+                    <td className="py-2 pr-2 whitespace-nowrap">{fmtWhen(s.logged_in_at)}</td>
+                    <td className="py-2 pr-2 whitespace-nowrap">{fmtWhen(s.logged_out_at || s.last_seen_at)}</td>
+                    <td className="py-2 pr-2 font-semibold">{fmtDur(s.duration_secs)}</td>
+                    <td className="py-2 pr-2">
+                      {s.is_online ? "🟢 Online" : s.logged_out_at ? `⚪ ${s.end_reason || "logged out"}` : "⚪ Idle"}
+                    </td>
+                    <td className="py-2 text-grey">{s.ip || "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {(d.logins || []).length === 0 && <p className="py-6 text-center text-grey">No logins recorded yet — they appear from the next sign-in.</p>}
+          </div>
+        </div>
       )}
 
       {tab === "activity" && (

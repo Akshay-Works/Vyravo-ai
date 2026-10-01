@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import PresencePing from "@/components/PresencePing";
 
 export interface NavItem { href: string; label: string; icon: string }
 
@@ -35,6 +36,7 @@ export default function WorkspaceShell({ items, title, accent, homeHref, admin, 
 
   return (
     <div className="min-h-screen bg-bg text-white">
+      <PresencePing />
       <header className="sticky top-0 z-20 border-b border-border bg-surface/95 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3">
           <Link href={homeHref} className="flex items-center gap-2">

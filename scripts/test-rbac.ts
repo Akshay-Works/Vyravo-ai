@@ -17,6 +17,7 @@ import {
   createContentTask, completeContentTask, ensureRecurringTasks,
   saveAsset, updateAsset, deleteAsset, recordMetrics,
 } from "@/lib/social-workspace/ops";
+import { recordLogin, touchPresence, endSession } from "@/lib/auth/presence";
 
 let pass = 0, fail = 0;
 const results: string[] = [];
@@ -162,11 +163,23 @@ async function main() {
   const HU: CurrentUser = hOwner === s1.id ? U1 : U2;
   ok("call queue shows task", (await getCallQueue(HU)).tasks.some((t: any) => Number(t.lead_id) === Number(hl)));
 
+  // --- login presence ---
+  await recordLogin(so.id, `sess-${tag}`, "1.2.3.4", "TestAgent");
+  ok("login recorded", (await pool.query(`SELECT count(*)::int n FROM employee_sessions WHERE user_id=$1 AND session_id=$2`, [so.id, `sess-${tag}`])).rows[0].n === 1);
+  await touchPresence(so.id, `sess-${tag}`);
+  ok("presence stays open", (await pool.query(`SELECT logged_out_at FROM employee_sessions WHERE session_id=$1`, [`sess-${tag}`])).rows[0].logged_out_at === null);
+  await endSession(`sess-${tag}`, "logout");
+  ok("logout stamps session end", !!(await pool.query(`SELECT logged_out_at FROM employee_sessions WHERE session_id=$1`, [`sess-${tag}`])).rows[0].logged_out_at);
+  const listed = (await listEmployees()).find((e: any) => e.id === so.id);
+  ok("listEmployees includes presence fields", listed && "is_online" in listed && "today_secs" in listed);
+
   // --- role changes + disable ---
   await setEmployeeRole(s2.id, "social");
   ok("role change works", (await pool.query(`SELECT workspace_role w FROM kb_users WHERE id=$1`, [s2.id])).rows[0].w === "social");
+  await recordLogin(so.id, `sess2-${tag}`, null, null);
   await setEmployeeStatus(so.id, false);
   ok("disable kills sessions", (await pool.query(`SELECT count(*)::int n FROM kb_sessions WHERE user_id=$1`, [so.id])).rows[0].n === 0);
+  ok("disable closes presence", (await pool.query(`SELECT count(*)::int n FROM employee_sessions WHERE user_id=$1 AND logged_out_at IS NULL`, [so.id])).rows[0].n === 0);
   await setEmployeeStatus(so.id, true);
 
   // --- audit + notify ---

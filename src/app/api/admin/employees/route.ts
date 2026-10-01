@@ -6,6 +6,7 @@ import {
   ensureRbacSchema, getCurrentUser, createEmployee, setEmployeeStatus,
   setEmployeeRole, listEmployees, assignLeads, audit,
 } from "@/lib/auth/rbac";
+import { listLoginHistory, endUserSessions } from "@/lib/auth/presence";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +21,7 @@ export async function GET(request: NextRequest) {
   if (g) return g;
   const u = new URL(request.url);
   const tab = u.searchParams.get("tab") || "team";
-  const [employees, activity, approvals] = await Promise.all([
+  const [employees, activity, approvals, logins] = await Promise.all([
     listEmployees(),
     tab === "activity"
       ? pool.query(`SELECT a.*, u.name AS user_name FROM audit_log a LEFT JOIN kb_users u ON u.id = a.user_id ORDER BY a.id DESC LIMIT 100`).then((r) => r.rows)
@@ -28,8 +29,9 @@ export async function GET(request: NextRequest) {
     tab === "approvals"
       ? pool.query(`SELECT p.*, a.name AS author_name FROM content_posts p LEFT JOIN kb_users a ON a.id = p.author_id WHERE p.status IN ('pending_approval','review') ORDER BY p.updated_at DESC`).then((r) => r.rows)
       : Promise.resolve([]),
+    tab === "logins" ? listLoginHistory(200) : Promise.resolve([]),
   ]);
-  return Response.json({ ok: true, employees, activity, approvals });
+  return Response.json({ ok: true, employees, activity, approvals, logins });
 }
 
 // POST { action: create|status|role|assign, ... }
@@ -61,6 +63,7 @@ export async function POST(request: NextRequest) {
         const pw = String(b.password || "");
         if (pw.length < 8) throw new Error("password must be 8+ characters");
         await pool.query(`UPDATE kb_users SET password_hash = $2, updated_at = now() WHERE id = $1`, [Number(b.id), hashPassword(pw)]);
+        await endUserSessions(Number(b.id), "password_reset");
         await pool.query(`DELETE FROM kb_sessions WHERE user_id = $1`, [Number(b.id)]); // force re-login
         await audit({ userId: me.id, role: me.role, action: "admin.employee_pw_reset", object: "user", objectId: b.id });
         return Response.json({ ok: true });

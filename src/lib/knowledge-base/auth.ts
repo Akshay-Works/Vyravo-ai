@@ -6,6 +6,7 @@
 import { cookies } from "next/headers";
 import { randomBytes, scryptSync, timingSafeEqual } from "crypto";
 import { pool } from "@/db";
+import { recordLogin, endSession } from "@/lib/auth/presence";
 
 const SESSION_COOKIE = "kb_session";
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7; // 7 days
@@ -49,12 +50,19 @@ export async function createSession(
      VALUES ($1, $2, $3, $4, $5)`,
     [sessionId, userId, new Date(Date.now() + SESSION_TTL_MS), ip || null, userAgent || null]
   );
+  await recordLogin(userId, sessionId, ip, userAgent);
   return sessionId;
+}
+
+export async function destroySession(sessionId: string): Promise<void> {
+  await endSession(sessionId, "logout");
+  await pool.query(`DELETE FROM kb_sessions WHERE id = $1`, [sessionId]);
 }
 
 export interface AnySession extends AdminSession {
   userId: number | null;
   workspaceRole: string | null;
+  sessionId: string;
 }
 
 /** Raw session lookup — ANY valid login (admin + employees). RBAC layer decides. */
@@ -86,7 +94,10 @@ export async function getAnySession(): Promise<AnySession | null> {
     }
     if (res.rowCount === 0) return null;
     const row = res.rows[0];
-    if (new Date(row.expires_at).getTime() < Date.now()) return null;
+    if (new Date(row.expires_at).getTime() < Date.now()) {
+      endSession(sessionId, "expired").catch(() => {});
+      return null;
+    }
     if (!row.is_active) return null;
 
     return {
@@ -96,6 +107,7 @@ export async function getAnySession(): Promise<AnySession | null> {
       role: (row.role || "admin") as AdminSession["role"],
       spaceId: row.space_id != null ? Number(row.space_id) : null,
       workspaceRole: row.workspace_role != null ? String(row.workspace_role) : null,
+      sessionId,
     };
   } catch {
     return null;

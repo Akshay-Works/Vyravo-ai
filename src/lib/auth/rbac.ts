@@ -10,6 +10,7 @@
 import { pool } from "@/db";
 import { getAnySession } from "@/lib/knowledge-base/auth";
 import { hashPassword } from "@/lib/portal/auth";
+import { ensurePresenceSchema, touchPresence, endUserSessions } from "@/lib/auth/presence";
 
 export type WorkspaceRole = "admin" | "sales" | "social";
 
@@ -23,6 +24,7 @@ export interface CurrentUser {
 export async function ensureRbacSchema(): Promise<void> {
   await pool.query(`ALTER TABLE kb_users ADD COLUMN IF NOT EXISTS workspace_role text`);
   await pool.query(`ALTER TABLE kb_users ADD COLUMN IF NOT EXISTS last_active_at timestamptz`);
+  await ensurePresenceSchema();
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS sales_calls (
@@ -120,7 +122,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
     const u = r.rows[0];
     const raw = String(u.workspace_role || "").toLowerCase();
     const role: WorkspaceRole = raw === "sales" || raw === "social" ? raw : "admin";
-    pool.query(`UPDATE kb_users SET last_active_at = now() WHERE id = $1 AND (last_active_at IS NULL OR last_active_at < now() - interval '5 minutes')`, [u.id]).catch(() => {});
+    if (s.sessionId) touchPresence(u.id, s.sessionId).catch(() => {});
     return { id: Number(u.id), email: u.email, name: u.name || u.email, role };
   } catch {
     return null;
@@ -203,7 +205,10 @@ export async function createEmployee(input: { name: string; email: string; passw
 
 export async function setEmployeeStatus(id: number, active: boolean): Promise<void> {
   await pool.query(`UPDATE kb_users SET is_active = $2, updated_at = now() WHERE id = $1`, [id, active]);
-  if (!active) await pool.query(`DELETE FROM kb_sessions WHERE user_id = $1`, [id]); // kill sessions
+  if (!active) {
+    await endUserSessions(id, "disabled");
+    await pool.query(`DELETE FROM kb_sessions WHERE user_id = $1`, [id]); // kill sessions
+  }
 }
 
 export async function setEmployeeRole(id: number, role: WorkspaceRole): Promise<void> {
@@ -222,8 +227,24 @@ export async function listEmployees(): Promise<any[]> {
             u.is_active, u.last_active_at, u.last_login_at, u.created_at,
             (SELECT count(*)::int FROM leads l WHERE l.owner_id = u.id) AS assigned_leads,
             (SELECT count(*)::int FROM sales_tasks t WHERE t.user_id = u.id AND t.status = 'open') AS open_tasks,
-            (SELECT count(*)::int FROM content_tasks t WHERE t.assignee_id = u.id AND t.status <> 'done') AS open_content_tasks
-     FROM kb_users u ORDER BY u.id`);
+            (SELECT count(*)::int FROM content_tasks t WHERE t.assignee_id = u.id AND t.status <> 'done') AS open_content_tasks,
+            ls.logged_in_at AS session_started_at,
+            ls.last_seen_at AS session_last_seen,
+            ls.logged_out_at AS session_ended_at,
+            EXTRACT(EPOCH FROM (COALESCE(ls.logged_out_at, ls.last_seen_at) - ls.logged_in_at))::int AS last_session_secs,
+            (ls.logged_out_at IS NULL AND ls.last_seen_at > now() - interval '10 minutes') AS is_online,
+            (SELECT COALESCE(SUM(EXTRACT(EPOCH FROM (COALESCE(s.logged_out_at, s.last_seen_at) - s.logged_in_at))),0)::int
+               FROM employee_sessions s
+              WHERE s.user_id = u.id
+                AND timezone('Asia/Kolkata', s.logged_in_at)::date = timezone('Asia/Kolkata', now())::date
+            ) AS today_secs
+     FROM kb_users u
+     LEFT JOIN LATERAL (
+       SELECT logged_in_at, last_seen_at, logged_out_at
+       FROM employee_sessions s WHERE s.user_id = u.id
+       ORDER BY s.logged_in_at DESC LIMIT 1
+     ) ls ON true
+     ORDER BY u.id`);
   return r.rows;
 }
 

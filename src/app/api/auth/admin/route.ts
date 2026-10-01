@@ -4,6 +4,7 @@ import {
   loginWithCredentials,
   checkEnvAdminPassword,
   createSession,
+  destroySession,
   sessionCookieName,
   sessionTtlSeconds,
   isAdminAuthenticated,
@@ -92,7 +93,7 @@ export async function DELETE() {
     const store = await cookies();
     const sessionId = store.get(sessionCookieName())?.value;
     if (sessionId) {
-      await pool.query(`DELETE FROM kb_sessions WHERE id = $1`, [sessionId]);
+      await destroySession(sessionId);
     }
     store.delete(sessionCookieName());
   } catch {
