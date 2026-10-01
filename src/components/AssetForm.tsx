@@ -26,7 +26,7 @@ export default function AssetForm() {
               <option value="info">ℹ️ Info / link</option>
             </select>
           </div>
-          <textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder="URL or text…" rows={3} className={input} />
+          <textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder="Paste the full asset — no word limit" rows={8} className={input} />
           <button disabled={busy || !name.trim()} onClick={async () => {
             setBusy(true);
             await fetch("/api/social/assets", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name, kind, body }) });

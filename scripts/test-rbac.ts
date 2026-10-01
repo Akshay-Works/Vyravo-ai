@@ -15,7 +15,7 @@ import {
 import {
   createPost, getPost, updatePost, transitionPost, deletePost,
   createContentTask, completeContentTask, ensureRecurringTasks,
-  saveAsset, recordMetrics,
+  saveAsset, updateAsset, deleteAsset, recordMetrics,
 } from "@/lib/social-workspace/ops";
 
 let pass = 0, fail = 0;
@@ -128,6 +128,14 @@ async function main() {
   await throws403("social cannot create tasks", () => createContentTask(USO, { title: "x" }));
   await throws403("social cannot save assets", () => saveAsset(USO, { name: "x" }));
   await throws403("social cannot record metrics", () => recordMetrics(USO, { platform: "instagram" }));
+  const ast = await saveAsset(UAD, { name: `${tag} asset`, kind: "info", body: "hello" });
+  ok("admin saves asset", ast.id > 0);
+  await updateAsset(UAD, ast.id, { body: "hello world" });
+  ok("admin updates asset", (await pool.query(`SELECT body FROM social_assets WHERE id=$1`, [ast.id])).rows[0].body === "hello world");
+  await throws403("social cannot update assets", () => updateAsset(USO, ast.id, { body: "nope" }));
+  await throws403("social cannot delete assets", () => deleteAsset(USO, ast.id));
+  await deleteAsset(UAD, ast.id);
+  ok("admin deletes asset", (await pool.query(`SELECT id FROM social_assets WHERE id=$1`, [ast.id])).rows.length === 0);
   const ct = await createContentTask(UAD, { title: `${tag} task`, assigneeId: so.id });
   ok("admin creates content task", ct.id > 0);
   await completeContentTask(USO, ct.id);

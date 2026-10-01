@@ -202,7 +202,7 @@ export async function ensureRecurringTasks(): Promise<number> {
 }
 
 export async function listAssets(): Promise<any[]> {
-  const r = await pool.query(`SELECT * FROM social_assets ORDER BY kind, name LIMIT 100`);
+  const r = await pool.query(`SELECT * FROM social_assets ORDER BY kind, name`);
   return r.rows;
 }
 
@@ -214,6 +214,26 @@ export async function saveAsset(u: CurrentUser, input: { name: string; kind?: st
     [input.name.trim(), (input.kind || "info").slice(0, 30), input.body || "", u.id]);
   await audit({ userId: u.id, role: u.role, action: "social.asset_added", object: "asset", objectId: ins.rows[0].id });
   return { id: Number(ins.rows[0].id) };
+}
+
+export async function updateAsset(u: CurrentUser, id: number, input: { name?: string; kind?: string; body?: string }): Promise<void> {
+  if (u.role !== "admin") throw Object.assign(new Error("only admin manages assets"), { status: 403 });
+  const sets: string[] = [];
+  const args: any[] = [id];
+  if (input.name !== undefined) { if (!input.name.trim()) throw new Error("name required"); args.push(input.name.trim()); sets.push(`name = $${args.length}`); }
+  if (input.kind !== undefined) { args.push(input.kind.slice(0, 30)); sets.push(`kind = $${args.length}`); }
+  if (input.body !== undefined) { args.push(input.body); sets.push(`body = $${args.length}`); }
+  if (!sets.length) return;
+  const r = await pool.query(`UPDATE social_assets SET ${sets.join(", ")} WHERE id = $1`, args);
+  if ((r.rowCount ?? 0) === 0) throw new Error("asset not found");
+  await audit({ userId: u.id, role: u.role, action: "social.asset_updated", object: "asset", objectId: id });
+}
+
+export async function deleteAsset(u: CurrentUser, id: number): Promise<void> {
+  if (u.role !== "admin") throw Object.assign(new Error("only admin manages assets"), { status: 403 });
+  const r = await pool.query(`DELETE FROM social_assets WHERE id = $1`, [id]);
+  if ((r.rowCount ?? 0) === 0) throw new Error("asset not found");
+  await audit({ userId: u.id, role: u.role, action: "social.asset_deleted", object: "asset", objectId: id });
 }
 
 export async function recordMetrics(u: CurrentUser, input: { platform: string; date?: string; followers?: number; reach?: number; engagement?: number; posts?: number }): Promise<void> {

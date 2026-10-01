@@ -2,11 +2,9 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/rbac";
 import { listAssets } from "@/lib/social-workspace/ops";
 import AssetForm from "@/components/AssetForm";
-import CopyButton from "@/components/CopyButton";
+import AssetCard from "@/components/AssetCard";
 
 export const dynamic = "force-dynamic";
-
-const KIND_ICON: Record<string, string> = { logo: "🖼️", guideline: "📖", template: "📝", creative: "🎨", info: "ℹ️" };
 
 export default async function SocialAssets() {
   const user = await getCurrentUser();
@@ -18,14 +16,7 @@ export default async function SocialAssets() {
       {user.role === "admin" && <AssetForm />}
       <div className="grid gap-3 md:grid-cols-2">
         {assets.map((a) => (
-          <div key={a.id} className="rounded-xl border border-border bg-surface p-3">
-            <div className="flex items-start justify-between gap-2">
-              <div className="text-sm font-semibold">{KIND_ICON[a.kind] || "📦"} {a.name}</div>
-              <CopyButton text={a.body || ""} />
-            </div>
-            <div className="mt-1 text-[11px] uppercase text-grey-dark">{a.kind}</div>
-            <p className="mt-2 max-h-64 overflow-y-auto whitespace-pre-wrap break-words text-xs text-grey">{a.body}</p>
-          </div>
+          <AssetCard key={a.id} asset={a} admin={user.role === "admin"} />
         ))}
         {assets.length === 0 && <p className="text-sm text-grey">No assets yet — admin adds brand files, guidelines and links here.</p>}
       </div>
