@@ -31,6 +31,7 @@ export async function ensurePresenceSchema(): Promise<void> {
     FROM kb_sessions s
     JOIN kb_users u ON u.id = s.user_id
     WHERE s.expires_at > now() AND s.user_id IS NOT NULL
+      AND NOT EXISTS (SELECT 1 FROM employee_sessions e WHERE e.user_id = s.user_id)
     ORDER BY s.user_id, s.created_at DESC NULLS LAST
     ON CONFLICT (session_id) DO NOTHING`);
 }
