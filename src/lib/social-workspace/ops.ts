@@ -208,8 +208,10 @@ export async function listAssets(): Promise<any[]> {
 
 export async function saveAsset(u: CurrentUser, input: { name: string; kind?: string; body?: string }): Promise<{ id: number }> {
   if (u.role !== "admin") throw Object.assign(new Error("only admin manages assets"), { status: 403 });
+  if (!input.name?.trim()) throw new Error("name required");
+  // No length limits on assets — the column is unbounded text.
   const ins = await pool.query(`INSERT INTO social_assets (name, kind, body, created_by) VALUES ($1,$2,$3,$4) RETURNING id`,
-    [input.name.slice(0, 200), (input.kind || "info").slice(0, 30), (input.body || "").slice(0, 8000), u.id]);
+    [input.name.trim(), (input.kind || "info").slice(0, 30), input.body || "", u.id]);
   await audit({ userId: u.id, role: u.role, action: "social.asset_added", object: "asset", objectId: ins.rows[0].id });
   return { id: Number(ins.rows[0].id) };
 }
