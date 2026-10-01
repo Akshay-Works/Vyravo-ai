@@ -89,6 +89,19 @@ export async function ensureRbacSchema(): Promise<void> {
       engagement integer NOT NULL DEFAULT 0, posts integer NOT NULL DEFAULT 0,
       created_at timestamptz DEFAULT now(), UNIQUE (platform, date)
     )`);
+  await pool.query(`ALTER TABLE social_metrics ADD COLUMN IF NOT EXISTS recorded_at timestamptz DEFAULT now()`);
+  await pool.query(`ALTER TABLE social_metrics ADD COLUMN IF NOT EXISTS recorded_by integer`);
+  await pool.query(`ALTER TABLE social_metrics ADD COLUMN IF NOT EXISTS notes text NOT NULL DEFAULT ''`);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS social_metric_log (
+      id serial PRIMARY KEY,
+      platform text NOT NULL DEFAULT '',
+      recorded_at timestamptz NOT NULL DEFAULT now(),
+      recorded_by integer REFERENCES kb_users(id) ON DELETE SET NULL,
+      followers integer, reach integer, engagement integer, posts integer,
+      prev_followers integer, notes text NOT NULL DEFAULT ''
+    )`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_social_metric_log_plat ON social_metric_log(platform, recorded_at DESC)`);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS notifications (

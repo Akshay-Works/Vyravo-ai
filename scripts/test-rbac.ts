@@ -128,7 +128,11 @@ async function main() {
   // --- admin-only social writes ---
   await throws403("social cannot create tasks", () => createContentTask(USO, { title: "x" }));
   await throws403("social cannot save assets", () => saveAsset(USO, { name: "x" }));
-  await throws403("social cannot record metrics", () => recordMetrics(USO, { platform: "instagram" }));
+  await throws403("sales cannot record metrics", () => recordMetrics(U1, { platform: "linkedin", followers: 1 }));
+  await recordMetrics(USO, { platform: `rbac-test-${tag}`, followers: 10 });
+  await recordMetrics(USO, { platform: `rbac-test-${tag}`, followers: 15 });
+  ok("social records metrics", (await pool.query(`SELECT followers FROM social_metrics WHERE platform=$1`, [`rbac-test-${tag}`])).rows[0].followers === 15);
+  ok("metrics history keeps each save", (await pool.query(`SELECT count(*)::int n FROM social_metric_log WHERE platform=$1`, [`rbac-test-${tag}`])).rows[0].n >= 2);
   const ast = await saveAsset(UAD, { name: `${tag} asset`, kind: "info", body: "hello" });
   ok("admin saves asset", ast.id > 0);
   await updateAsset(UAD, ast.id, { body: "hello world" });
@@ -197,6 +201,8 @@ async function main() {
   await pool.query(`DELETE FROM content_tasks WHERE title LIKE '${tag}%' OR description LIKE '%${tag}%'`);
   await pool.query(`DELETE FROM content_posts WHERE caption LIKE '%test post%' OR caption = 'draft2'`);
   await pool.query(`DELETE FROM social_metrics WHERE platform = 'instagram' AND followers = 0 AND date = CURRENT_DATE`);
+  await pool.query(`DELETE FROM social_metric_log WHERE platform LIKE 'rbac-test-%'`);
+  await pool.query(`DELETE FROM social_metrics WHERE platform LIKE 'rbac-test-%'`);
   await pool.query(`DELETE FROM kb_users WHERE email LIKE '${tag}%@test.local'`);
   await pool.query(`DELETE FROM kb_users WHERE email LIKE '${tag}%'`);
   ok("cleanup done", (await pool.query(`SELECT count(*)::int n FROM kb_users WHERE email LIKE '%test.local'`)).rows[0].n === 0);

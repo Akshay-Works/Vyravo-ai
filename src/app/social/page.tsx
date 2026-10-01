@@ -65,8 +65,20 @@ export default async function SocialOverview() {
       </div>
       <div className="rounded-xl border border-border bg-surface p-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold">📈 Total followers: {followers.toLocaleString("en-IN")}</h2>
-          <Link href="/social/analytics" className="text-xs text-primary">Analytics →</Link>
+          <h2 className="text-sm font-semibold">📈 Live page stats · {followers.toLocaleString("en-IN")} followers total</h2>
+          <Link href="/social/analytics" className="text-xs text-primary">Update / history →</Link>
+        </div>
+        <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {ov.metrics.map((m: any) => (
+            <div key={m.platform} className="rounded-lg bg-surface-2 p-2 text-xs">
+              <div className="capitalize text-grey">{m.platform}</div>
+              <div className="text-lg font-bold">{Number(m.followers || 0).toLocaleString("en-IN")}</div>
+              <div className="text-[11px] text-grey-dark">
+                {m.recorded_at ? new Date(m.recorded_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : m.date || ""}
+              </div>
+            </div>
+          ))}
+          {ov.metrics.length === 0 && <p className="text-xs text-grey">No snapshots yet — open Analytics to log LinkedIn followers.</p>}
         </div>
       </div>
     </div>
