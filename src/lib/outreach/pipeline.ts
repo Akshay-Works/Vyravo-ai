@@ -433,7 +433,7 @@ export async function processOutreachQueue(cfg: OutreachConfig): Promise<{ sent:
     `SELECT q.* FROM email_queue q
      WHERE q.status = 'pending' AND q.scheduled_for <= now()
        AND q.template_data->>'outreach_event_id' IS NOT NULL
-     ORDER BY (q.template_data->>'followUpNumber')::int DESC NULLS LAST, q.scheduled_for, q.id
+     ORDER BY q.scheduled_for, q.id
      LIMIT 200`
   );
 
@@ -463,7 +463,20 @@ export async function processOutreachQueue(cfg: OutreachConfig): Promise<{ sent:
   const BATCH_CAP = Math.max(1, Number.parseInt(process.env.OUTREACH_MAX_BATCH || "8", 10) || 8);
   const TIME_BUDGET_MS = 45_000;
   const loopStart = Date.now();
-  const batch = (rows.rows as any[]).slice(0, Math.min(remaining, BATCH_CAP));
+  const take = Math.min(remaining, BATCH_CAP);
+  // Don't let follow-ups starve 3-week-old intros (ORDER BY FU DESC used to
+  // send only FU3 in an 8-email Hobby cron). Interleave oldest intro + oldest follow-up.
+  const fu0: any[] = [];
+  const fuN: any[] = [];
+  for (const r of rows.rows as any[]) {
+    (Number(r.template_data?.followUpNumber || 0) === 0 ? fu0 : fuN).push(r);
+  }
+  const mixed: any[] = [];
+  while (mixed.length < take && (fu0.length || fuN.length)) {
+    if (fu0.length) mixed.push(fu0.shift());
+    if (mixed.length < take && fuN.length) mixed.push(fuN.shift());
+  }
+  const batch = mixed;
   const capped = rows.rows.length > batch.length;
 
   let sent = 0, failed = 0, skipped = 0, truncated = false;
