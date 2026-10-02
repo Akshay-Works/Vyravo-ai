@@ -3,6 +3,7 @@ import { timingSafeEqual } from "crypto";
 import { recordHeartbeat } from "@/lib/activity/heartbeat";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 const ENGINE_REPO = "Akshay-Works/Vyravo-Lead-Engine";
 const ENGINE_WORKFLOW_ID = 345978148; // daily-leads.yml
@@ -95,8 +96,24 @@ export async function GET(request: NextRequest) {
       overflow = { checked: false, error: String(e?.message || e).slice(0, 120) };
     }
     console.log("kick-engine overflow:", JSON.stringify(overflow));
-    await recordHeartbeat("cron_kick_engine", "ok", { dispatched: ENGINE_WORKFLOW_ID, funnel2, overflow });
-    return Response.json({ ok: true, dispatched: ENGINE_WORKFLOW_ID, funnel2, overflow, at: new Date().toISOString() });
+    // Second send window (Hobby only has 2 crons). emails cron at 02:00 UTC
+    // sends ~20; this 04:00 UTC tick drains the rest up to daily_limit.
+    let outreachSend: any = { skipped: true };
+    try {
+      const { processOutreachQueue, ensureOutreachSchema } = await import("@/lib/outreach/pipeline");
+      const { getOutreachConfig } = await import("@/lib/outreach/config");
+      await ensureOutreachSchema();
+      const cfg = await getOutreachConfig();
+      if (cfg.auto_outreach && !cfg.test_mode) {
+        outreachSend = await processOutreachQueue(cfg);
+      } else {
+        outreachSend = { skipped: true, reason: cfg.test_mode ? "test_mode" : "auto_off" };
+      }
+    } catch (e: any) {
+      outreachSend = { error: String(e?.message || e).slice(0, 120) };
+    }
+    await recordHeartbeat("cron_kick_engine", "ok", { dispatched: ENGINE_WORKFLOW_ID, funnel2, overflow, outreachSend });
+    return Response.json({ ok: true, dispatched: ENGINE_WORKFLOW_ID, funnel2, overflow, outreachSend, at: new Date().toISOString() });
   } catch (e: any) {
     console.error("kick-engine error:", e.message);
     await recordHeartbeat("cron_kick_engine", "error", {});

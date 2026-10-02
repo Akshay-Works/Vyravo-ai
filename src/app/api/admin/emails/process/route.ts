@@ -5,6 +5,7 @@ import { processOutreachQueue, ensureOutreachSchema } from "@/lib/outreach/pipel
 import { getOutreachConfig } from "@/lib/outreach/config";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 // POST /api/admin/emails/process — admin-only. Runs the email worker NOW.
 // Use this after queueing personalized emails instead of waiting for a cron.

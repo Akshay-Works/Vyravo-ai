@@ -460,7 +460,8 @@ export async function processOutreachQueue(cfg: OutreachConfig): Promise<{ sent:
   // at 20s gaps would exceed that, so each invocation only takes a bounded
   // slice; the queue is stateful (pending -> sent/failed), so the next tick
   // (cron 02:00 + 3 engine hooks/day, or manual Run now) simply continues.
-  const BATCH_CAP = Math.max(1, Number.parseInt(process.env.OUTREACH_MAX_BATCH || "8", 10) || 8);
+  // Hobby cron is 60s. 2s gap × 20 sends ≈ 40s + overhead, fits the 45s budget.
+  const BATCH_CAP = Math.max(1, Number.parseInt(process.env.OUTREACH_MAX_BATCH || "20", 10) || 20);
   const TIME_BUDGET_MS = 45_000;
   const loopStart = Date.now();
   const take = Math.min(remaining, BATCH_CAP);
