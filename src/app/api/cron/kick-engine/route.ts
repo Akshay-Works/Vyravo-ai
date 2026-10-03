@@ -112,8 +112,15 @@ export async function GET(request: NextRequest) {
     } catch (e: any) {
       outreachSend = { error: String(e?.message || e).slice(0, 120) };
     }
-    await recordHeartbeat("cron_kick_engine", "ok", { dispatched: ENGINE_WORKFLOW_ID, funnel2, overflow, outreachSend });
-    return Response.json({ ok: true, dispatched: ENGINE_WORKFLOW_ID, funnel2, overflow, outreachSend, at: new Date().toISOString() });
+    let career: any = { skipped: true };
+    try {
+      const { runCareerDaily } = await import("@/lib/career/pipeline");
+      career = await runCareerDaily({ budgetMs: 15000 });
+    } catch (e: any) {
+      career = { error: String(e?.message || e).slice(0, 160) };
+    }
+    await recordHeartbeat("cron_kick_engine", "ok", { dispatched: ENGINE_WORKFLOW_ID, funnel2, overflow, outreachSend, career });
+    return Response.json({ ok: true, dispatched: ENGINE_WORKFLOW_ID, funnel2, overflow, outreachSend, career, at: new Date().toISOString() });
   } catch (e: any) {
     console.error("kick-engine error:", e.message);
     await recordHeartbeat("cron_kick_engine", "error", {});

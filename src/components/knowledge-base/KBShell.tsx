@@ -7,6 +7,7 @@ import PresencePing from "@/components/PresencePing";
 
 const NAV_ITEMS = [
   { href: "/admin/employees", label: "Employees", icon: "🧑‍💼" },
+  { href: "/admin/career", label: "CareerPilot AI", icon: "🧭" },
   { href: "/admin/analytics", label: "Analytics", icon: "📊" },
   { href: "/admin/visitors", label: "Visitors", icon: "👀" },
   { href: "/admin/crm/clients", label: "CRM", icon: "👥" },
